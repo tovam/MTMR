@@ -28,14 +28,26 @@ jobs:
       - name: Build App
         run: xcodebuild -project "MTMR.xcodeproj" -exportArchive -archivePath Release/App.xcarchive -exportOptionsPlist export-options.plist -exportPath Release | xcpretty -c && exit ${PIPESTATUS[0]}
 
+      - name: Locate App Bundle
+        id: app
+        run: |
+          APP_PATH=$(ls -1 Release/*.app 2>/dev/null | head -n 1)
+          if [ -z "$APP_PATH" ]; then
+            echo "No .app found in Release"
+            ls -la Release
+            exit 1
+          fi
+          echo "app_path=$APP_PATH" >> "$GITHUB_OUTPUT"
+
       - name: Create DMG
         run: |
+          APP_BASENAME=$(basename "${{ steps.app.outputs.app_path }}")
           cd Release
-          create-dmg "MTMR tovam.app" || true
+          create-dmg "$APP_BASENAME" || true
 
       - name: GitHub Release
         uses: "marvinpinto/action-automatic-releases@latest"
         with:
           repo_token: "${{ secrets.GITHUB_TOKEN }}"
           prerelease: false
-          files: Release/MTMR*.dmg
+          files: Release/*.dmg
