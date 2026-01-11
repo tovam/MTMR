@@ -13,7 +13,8 @@ struct ExactItem {
     let presetItem: BarItemDefinition
 }
 
-let appSupportDirectory = NSSearchPathForDirectoriesInDomains(.applicationSupportDirectory, .userDomainMask, true).first!.appending("/MTMR")
+let appSupportDirectoryName = "MTMR tovam"
+let appSupportDirectory = NSSearchPathForDirectoriesInDomains(.applicationSupportDirectory, .userDomainMask, true).first!.appending("/\(appSupportDirectoryName)")
 let standardConfigPath = appSupportDirectory.appending("/items.json")
 
 extension ItemType {

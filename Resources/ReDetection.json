@@ -14,9 +14,8 @@
   { "type": "appleScriptTitledButton", "source": { "inline": "if application \"iTunes\" is running then\r\ttell application \"iTunes\"\r\t\tif player state is not stopped then return \"\"\r\tend tell\rend if\rif application \"Safari\" is running then\r\ttell application \"Safari\"\r\t\trepeat with t in tabs of windows\r\t\t\ttell t\r\t\t\t\tif URL starts with \"https:\/\/music.yandex.ru\" and name does not end with \"на Яндекс.Музыке\" then\r\t\t\t\t\treturn \"\"\r\t\t\t\tend if\r\t\t\tend tell\r\t\tend repeat\r\tend tell\rend if\rreturn \"▶\"" }, "refreshInterval": 30, "width": 40, "align": "right" },
   { "type": "volume", "width": 100, "align": "right" },
   { "type": "displaySleep", "width": 44, "align": "right" },
-  { "type": "appleScriptTitledButton", "refreshInterval": 1800, "source": { "filePath": "~/Library/Application Support/MTMR/Weather.scpt"}, "align": "right" },
+  { "type": "appleScriptTitledButton", "refreshInterval": 1800, "source": { "filePath": "~/Library/Application Support/MTMR tovam/Weather.scpt"}, "align": "right" },
 
 
   { "type": "timeButton" , "align": "right"},
   ]
-

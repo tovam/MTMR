@@ -48,6 +48,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ inputs.tag }}
+          target_commitish: ${{ github.sha }}
           name: ${{ inputs.release_name || inputs.tag }}
           prerelease: ${{ inputs.prerelease == 'true' }}
           files: Release/MTMR*.dmg

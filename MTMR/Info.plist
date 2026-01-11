@@ -58,10 +58,6 @@
 	<string>MTMR needs access to Reminders for work</string>
 	<key>NSSystemAdministrationUsageDescription</key>
 	<string>MTMR needs access to Administation for work</string>
-	<key>SUFeedURL</key>
-	<string>https://mtmr.app/appcast.xml</string>
-	<key>SUPublicDSAKeyFile</key>
-	<string>dsa_pub.pem</string>
 	<key>kTCCServiceMediaLibrary</key>
 	<string>MTMR needs access to Music for work</string>
 </dict>

@@ -18,7 +18,7 @@
 - [x] Add icon and menu in StatusBar
 - [x] Hide from Dock
 - [x] Status menu: "preferences", "quit"
-- [x] JSON or another approch for save preset, maybe in `~/Library/Application Support/MTMR/`
+- [x] JSON or another approch for save preset, maybe in `~/Library/Application Support/MTMR tovam/`
 - [x] Custom buttons size, actions by click
 - [x] Layout: [always left, NSSliderView for center, always right]
 - [x] System for autoupdate (https://sparkle-project.org/)

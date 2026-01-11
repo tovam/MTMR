@@ -150,7 +150,7 @@ You may create as many `swipe` objects in the preset as you want.
     "type": "appleScriptTitledButton",
     "refreshInterval": 60, //optional
     "source": {
-      "filePath": "~/Library/Application Support/MTMR/iTunes.nowPlaying.scpt",
+      "filePath": "~/Library/Application Support/MTMR tovam/iTunes.nowPlaying.scpt",
       // or
       "inline": "tell application \"Finder\"\rif not (exists window 1) then\rmake new Finder window\rset target of front window to path to home folder as string\rend if\ractivate\rend tell",
       // or
