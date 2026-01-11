@@ -31,7 +31,7 @@ jobs:
       - name: Create DMG
         run: |
           cd Release
-          create-dmg MTMR.app || true
+          create-dmg "MTMR tovam.app" || true
 
       - name: GitHub Release
         uses: "marvinpinto/action-automatic-releases@latest"
