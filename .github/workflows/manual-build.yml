@@ -1,0 +1,53 @@
+name: Manual build and release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag (e.g. v1.2.3 or manual-2026-01-11)"
+        required: true
+      prerelease:
+        description: "Mark release as prerelease (true/false)"
+        required: false
+        default: "false"
+      release_name:
+        description: "Release title (optional)"
+        required: false
+        default: ""
+
+permissions:
+  contents: write
+
+jobs:
+  build-release:
+    runs-on: macOS-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install create-dmg
+        run: npm i -g create-dmg
+
+      - name: Build Archive
+        run: xcodebuild archive -project "MTMR.xcodeproj" -scheme "MTMR" -archivePath Release/App.xcarchive DEVELOPMENT_TEAM="" CODE_SIGN_IDENTITY="" | xcpretty -c && exit ${PIPESTATUS[0]}
+
+      - name: Build App
+        run: xcodebuild -project "MTMR.xcodeproj" -exportArchive -archivePath Release/App.xcarchive -exportOptionsPlist export-options.plist -exportPath Release | xcpretty -c && exit ${PIPESTATUS[0]}
+
+      - name: Create DMG
+        run: |
+          cd Release
+          create-dmg MTMR.app || true
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ inputs.tag }}
+          name: ${{ inputs.release_name || inputs.tag }}
+          prerelease: ${{ inputs.prerelease == 'true' }}
+          files: Release/MTMR*.dmg
