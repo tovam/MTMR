@@ -75,7 +75,7 @@ class CPUBarItem: CustomButtonTouchBarItem {
         }
     }
     
-    deinit {
+    isolated deinit {
         refreshQueue?.suspend()
         refreshQueue = nil
     }

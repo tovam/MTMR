@@ -326,7 +326,7 @@ class LongPressGestureRecognizer: NSPressGestureRecognizer {
         }
     }
     
-    deinit {
+    isolated deinit {
         timerInvalidate()
     }
 }

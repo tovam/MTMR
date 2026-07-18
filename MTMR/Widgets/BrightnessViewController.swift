@@ -30,7 +30,7 @@ class BrightnessViewController: NSCustomTouchBarItem {
         fatalError("init(coder:) has not been implemented")
     }
 
-    deinit {
+    isolated deinit {
         sliderItem.unbind(NSBindingName.value)
     }
 

@@ -61,7 +61,7 @@ class PomodoroBarItem: CustomButtonTouchBarItem, Widget {
         fatalError("init(coder:) has not been implemented")
     }
 
-    deinit {
+    isolated deinit {
         timer?.cancel()
         timer = nil
     }
