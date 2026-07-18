@@ -65,6 +65,9 @@ class AppScrubberTouchBarItem: NSCustomTouchBarItem {
             
             let width = self.scrollView.documentView?.fittingSize.width ?? 0
             self.widthConstraint = self.scrollView.widthAnchor.constraint(equalToConstant: width)
+            // Preserve the Dock's natural width while still allowing the zone
+            // container to clip an unusually large list of applications.
+            self.widthConstraint!.priority = .defaultHigh
             self.widthConstraint!.isActive = true
         }
     }

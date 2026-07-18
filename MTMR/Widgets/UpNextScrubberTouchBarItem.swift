@@ -106,6 +106,7 @@ class UpNextScrubberTouchBarItem: NSCustomTouchBarItem {
             
             let width = self.scrollView.documentView?.fittingSize.width ?? 0
             self.widthConstraint = self.scrollView.widthAnchor.constraint(equalToConstant: width)
+            self.widthConstraint!.priority = .defaultHigh
             self.widthConstraint!.isActive = true
         }
     }

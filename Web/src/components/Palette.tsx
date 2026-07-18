@@ -8,7 +8,7 @@ export const DRAG_TYPE = "application/x-mmtmr-item";
 
 export type DragPayload =
   | { kind: "palette"; type: string }
-  | { kind: "item"; id: string };
+  | { kind: "item"; id: string; width?: number };
 
 let activeDragPayload: DragPayload | undefined;
 
@@ -32,7 +32,15 @@ export function getDragPayload(event: DragEvent): DragPayload | undefined {
       const raw = event.dataTransfer.getData(DRAG_TYPE) || event.dataTransfer.getData("text/plain");
       const value = JSON.parse(raw) as DragPayload;
       if (value.kind === "palette" && typeof value.type === "string") return value;
-      if (value.kind === "item" && typeof value.id === "string") return value;
+      if (value.kind === "item" && typeof value.id === "string") {
+        return {
+          kind: "item",
+          id: value.id,
+          ...(typeof value.width === "number" && Number.isFinite(value.width) && value.width > 0
+            ? { width: value.width }
+            : {}),
+        };
+      }
     } catch {
       // Falling back to the payload captured at dragstart is intentional.
     }

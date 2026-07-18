@@ -250,7 +250,7 @@ describe("éditeur MMTMR", () => {
 
     fireEvent.dragStart(item);
     fireEvent.dragOver(right);
-    expect(within(right).getByTestId("drop-indicator-right")).toHaveClass("drop-indicator-empty");
+    expect(within(right).getByTestId("drop-slot-right")).toContainElement(within(right).getByTestId("drop-indicator-right"));
     fireEvent.drop(right);
 
     await waitFor(() => expect(within(right).getByRole("button", { name: "Bonjour" })).toBeInTheDocument());
@@ -297,6 +297,7 @@ describe("éditeur MMTMR", () => {
     }) as DOMRect;
     vi.spyOn(alpha, "getBoundingClientRect").mockReturnValue(bounds(100, 40));
     vi.spyOn(omega, "getBoundingClientRect").mockReturnValue(bounds(150, 40));
+    Object.defineProperty(dragged, "offsetWidth", { configurable: true, value: 60 });
 
     fireEvent.dragStart(dragged);
     const dragOver = new Event("dragover", { bubbles: true, cancelable: true });
@@ -305,7 +306,10 @@ describe("éditeur MMTMR", () => {
       clientY: { value: 17 },
     });
     fireEvent(center, dragOver);
-    expect(within(omega).getByTestId("drop-indicator-center")).toHaveClass("drop-indicator-before");
+    const slot = within(center).getByTestId("drop-slot-center");
+    expect(slot).toHaveStyle({ width: "60px" });
+    expect(slot.nextElementSibling).toBe(omega);
+    expect(slot).toContainElement(within(center).getByTestId("drop-indicator-center"));
     fireEvent.drop(center);
 
     await waitFor(() => {

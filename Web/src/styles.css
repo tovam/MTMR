@@ -104,13 +104,8 @@ h3 { margin: 2px 0 0; font-size: 14px; }
   border-radius: 5px; border: 1px solid #50565d; background: var(--touch-item); color: #f4f5f6;
   cursor: grab; display: inline-flex; align-items: center; justify-content: center; gap: 5px;
 }
-.drop-indicator { position: absolute; z-index: 20; top: 2px; bottom: 2px; width: 3px; border-radius: 999px; background: var(--drop-red); box-shadow: 0 0 0 1px rgba(255, 255, 255, .82), 0 0 7px rgba(255, 59, 48, .78); pointer-events: none; }
-.drop-indicator-before { left: 0; }
-.drop-indicator-after { right: 0; }
-.drop-indicator-empty { top: 6px; bottom: 6px; }
-.drop-zone-left .drop-indicator-empty { left: 4px; }
-.drop-zone-center .drop-indicator-empty { left: 50%; transform: translateX(-50%); }
-.drop-zone-right .drop-indicator-empty { right: 4px; }
+.drop-preview-slot { flex: 0 1 auto; min-width: 18px; height: 34px; position: relative; pointer-events: none; }
+.drop-indicator { position: absolute; z-index: 20; left: -2px; top: 2px; bottom: 2px; width: 3px; border-radius: 999px; background: var(--drop-red); box-shadow: 0 0 0 1px rgba(255, 255, 255, .82), 0 0 7px rgba(255, 59, 48, .78); pointer-events: none; }
 .touch-item:hover { border-color: #858c94; background: #383d43; }
 .touch-item.is-selected { border-color: var(--blue); background: #3b4e61; }
 .touch-item.has-native-render { padding: 0; border-color: transparent; background: transparent; }

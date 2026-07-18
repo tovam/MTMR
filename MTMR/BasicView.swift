@@ -6,7 +6,7 @@
 //  Copyright © 2020 Anton Palgunov. All rights reserved.
 //
 
-import Foundation
+import AppKit
 
 private final class TouchBarZonesView: NSView {
     private let leftContainer = NSView()
@@ -89,6 +89,11 @@ private final class TouchBarZonesView: NSView {
         stack.distribution = .fill
         stack.spacing = 2
         stack.translatesAutoresizingMaskIntoConstraints = false
+        // Without an explicit horizontal hugging priority AppKit may stretch an
+        // intrinsic center stack to the full zone width. Its arranged views are
+        // then laid out from that stretched stack's leading edge, so `center`
+        // visually behaves like the left edge of the middle third.
+        stack.setContentHuggingPriority(.required, for: .horizontal)
         return stack
     }
 
@@ -113,21 +118,42 @@ private final class TouchBarZonesView: NSView {
     }
 
     private func replaceArrangedSubviews(of stack: NSStackView, with views: [NSView]) {
+        let fillWidthConstraint = fillWidthConstraints[ObjectIdentifier(stack)]
+        fillWidthConstraint?.isActive = false
         for view in stack.arrangedSubviews {
             stack.removeArrangedSubview(view)
             view.removeFromSuperview()
         }
+        let unboundedScrollViews = views.compactMap { view -> NSScrollView? in
+            guard let scrollView = view as? NSScrollView else { return nil }
+            let hasWidth = scrollView.constraints.contains { constraint in
+                constraint.isActive
+                    && constraint.relation == .equal
+                    && constraint.firstItem === scrollView
+                    && constraint.firstAttribute == .width
+            }
+            return hasWidth ? nil : scrollView
+        }
+        let fillsAvailableWidth = !unboundedScrollViews.isEmpty
+        stack.setContentHuggingPriority(fillsAvailableWidth ? .defaultLow : .required, for: .horizontal)
         for view in views {
-            if view is NSScrollView {
-                view.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
-                view.setContentHuggingPriority(.defaultLow, for: .horizontal)
+            if let scrollView = view as? NSScrollView {
+                // A scrollable widget may shrink when its natural width is wider
+                // than its physical third, but it must not stretch the whole
+                // stack. Stretching the stack moves a centered group to the
+                // leading edge of the center zone.
+                scrollView.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+                scrollView.setContentHuggingPriority(
+                    unboundedScrollViews.contains { $0 === scrollView } ? .defaultLow : .defaultHigh,
+                    for: .horizontal
+                )
             }
             stack.addArrangedSubview(view)
         }
-        // A dock or scroll area consumes the free space remaining in its own
-        // physical third. Without this equality AppKit collapses the scroll
-        // view to zero because it intentionally has low hugging priority.
-        fillWidthConstraints[ObjectIdentifier(stack)]?.isActive = views.contains { $0 is NSScrollView }
+        // Preserve the historical fill behaviour only for scroll widgets that
+        // deliberately have no width. Center scroll areas and auto-sized Docks
+        // carry a natural-width constraint and therefore hug their content.
+        fillWidthConstraint?.isActive = fillsAvailableWidth
     }
 }
 

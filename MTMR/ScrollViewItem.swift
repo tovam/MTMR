@@ -1,4 +1,4 @@
-import Foundation
+import AppKit
 
 class ScrollViewItem: NSCustomTouchBarItem/*, NSGestureRecognizerDelegate*/ {
 
@@ -8,8 +8,12 @@ class ScrollViewItem: NSCustomTouchBarItem/*, NSGestureRecognizerDelegate*/ {
         let stackView = NSStackView(views: views)
         stackView.spacing = 1
         stackView.orientation = .horizontal
-        let scrollView = NSScrollView(frame: CGRect(origin: .zero, size: stackView.fittingSize))
+        let contentSize = stackView.fittingSize
+        let scrollView = NSScrollView(frame: CGRect(origin: .zero, size: contentSize))
         scrollView.documentView = stackView
+        let naturalWidth = scrollView.widthAnchor.constraint(equalToConstant: contentSize.width)
+        naturalWidth.priority = .defaultHigh
+        naturalWidth.isActive = true
         view = scrollView
     }
 

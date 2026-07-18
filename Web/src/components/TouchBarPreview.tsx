@@ -1,3 +1,4 @@
+import { Fragment } from "preact";
 import { useEffect, useRef, useState } from "preact/hooks";
 import { createItem, itemLabel, itemPresentation } from "../model";
 import type {
@@ -27,7 +28,11 @@ interface TouchBarPreviewProps {
 interface DropIndicatorTarget {
   align: Alignment;
   beforeID?: string;
+  draggedItemID?: string;
+  previewWidth: number;
 }
+
+const DEFAULT_DROP_PREVIEW_WIDTH = 64;
 
 function insertionTarget(
   zone: HTMLDivElement,
@@ -89,22 +94,20 @@ function configuredImageDataURL(item: ItemConfig): string | undefined {
 
 function PreviewItem({
   item,
-  align,
   selected,
   simulation,
   geometry,
   onSelect,
   editingLocked,
-  dropEdge,
+  previewScale,
 }: {
   item: ItemConfig;
-  align: Alignment;
   selected: boolean;
   simulation: SimulationContext;
   geometry?: RuntimeItemGeometry;
   onSelect(id: string): void;
   editingLocked: boolean;
-  dropEdge?: "before" | "after";
+  previewScale: number;
 }) {
   const kind = geometry?.kind ?? item.type;
   const presentation = itemPresentation(kind);
@@ -137,7 +140,13 @@ function PreviewItem({
           event.preventDefault();
           return;
         }
-        setDragPayload(event, { kind: "item", id: item.id });
+        const renderedWidth = event.currentTarget.getBoundingClientRect().width;
+        const width = event.currentTarget.offsetWidth || renderedWidth / Math.max(previewScale, 0.001);
+        setDragPayload(event, {
+          kind: "item",
+          id: item.id,
+          ...(Number.isFinite(width) && width > 0 ? { width } : {}),
+        });
       }}
       onDragEnd={clearDragPayload}
       onClick={() => onSelect(item.id)}
@@ -145,13 +154,6 @@ function PreviewItem({
       aria-label={displayedTitle || presentation.label}
       title={`${itemLabel(item)} · ${item.type}`}
     >
-      {dropEdge && (
-        <span
-          class={`drop-indicator drop-indicator-${dropEdge}`}
-          data-testid={`drop-indicator-${align}`}
-          aria-hidden="true"
-        />
-      )}
       {renderedImage ? (
         <img class="touch-item-image touch-item-complete-render" src={renderedImage} alt="" aria-hidden="true" draggable={false} />
       ) : (
@@ -177,7 +179,12 @@ export function TouchBarPreview(props: TouchBarPreviewProps) {
   const dropTargetRef = useRef<DropIndicatorTarget>();
   const updateDropTarget = (target?: DropIndicatorTarget) => {
     const current = dropTargetRef.current;
-    if (current?.align === target?.align && current?.beforeID === target?.beforeID) return;
+    if (
+      current?.align === target?.align
+      && current?.beforeID === target?.beforeID
+      && current?.draggedItemID === target?.draggedItemID
+      && current?.previewWidth === target?.previewWidth
+    ) return;
     dropTargetRef.current = target;
     setDropTarget(target);
   };
@@ -244,11 +251,34 @@ export function TouchBarPreview(props: TouchBarPreviewProps) {
       const rightX = geometries.get(right.id)?.x;
       return typeof leftX === "number" && typeof rightX === "number" ? leftX - rightX : 0;
     });
-  const dropEdgeFor = (items: ItemConfig[], itemID: string): "before" | "after" | undefined => {
-    if (dropTarget?.beforeID === itemID) return "before";
-    if (dropTarget?.beforeID === undefined && items.at(-1)?.id === itemID) return "after";
-    return undefined;
+  const dropPreviewWidth = (payload: ReturnType<typeof getDragPayload>): number => {
+    if (payload?.kind === "item") {
+      if (typeof payload.width === "number") return payload.width;
+      const dragged = Array.from(trackRef.current?.querySelectorAll<HTMLElement>(".touch-item") ?? [])
+        .find((element) => element.dataset.itemId === payload.id);
+      if (dragged) {
+        const width = dragged.offsetWidth || dragged.getBoundingClientRect().width / Math.max(scale, 0.001);
+        if (Number.isFinite(width) && width > 0) return width;
+      }
+    }
+    if (payload?.kind === "palette") {
+      const candidate = createItem(payload.type, props.schema);
+      if (typeof candidate.width === "number") return Math.max(18, candidate.width);
+      const label = itemLabel(candidate);
+      return Math.max(DEFAULT_DROP_PREVIEW_WIDTH, Math.min(180, 28 + label.length * 7));
+    }
+    return DEFAULT_DROP_PREVIEW_WIDTH;
   };
+  const previewSlot = (align: Alignment) => (
+    <span
+      class="drop-preview-slot"
+      data-testid={`drop-slot-${align}`}
+      style={{ width: `${dropTarget?.previewWidth ?? DEFAULT_DROP_PREVIEW_WIDTH}px` }}
+      aria-hidden="true"
+    >
+      <span class="drop-indicator" data-testid={`drop-indicator-${align}`} />
+    </span>
+  );
   return (
     <section class={`preview-shell preview-theme-${props.simulation.theme}`} data-theme={props.simulation.theme} aria-label="Aperçu de la Touch Bar">
       <div class="section-title-row">
@@ -278,8 +308,11 @@ export function TouchBarPreview(props: TouchBarPreviewProps) {
           <div class="touchbar-fit" ref={fitRef}>
             <div class="touchbar-track" ref={trackRef} style={{ transform: `scale(${scale})` }}>
               {(["left", "center", "right"] as Alignment[]).map((align) => {
-                const items = byAlignment(align);
+                const zoneItems = byAlignment(align);
                 const active = dropTarget?.align === align;
+                const items = active && dropTarget?.draggedItemID
+                  ? zoneItems.filter((item) => item.id !== dropTarget.draggedItemID)
+                  : zoneItems;
                 return (
                   <div
                     class={`drop-zone drop-zone-${align} ${active ? "drag-over" : ""}`}
@@ -289,12 +322,14 @@ export function TouchBarPreview(props: TouchBarPreviewProps) {
                     onDragOver={(event) => {
                       if (props.editingLocked) return;
                       event.preventDefault();
-                      if (event.dataTransfer) event.dataTransfer.dropEffect = "move";
                       const payload = getDragPayload(event);
+                      if (event.dataTransfer) event.dataTransfer.dropEffect = payload?.kind === "palette" ? "copy" : "move";
                       const draggedItemID = payload?.kind === "item" ? payload.id : undefined;
                       updateDropTarget({
                         align,
                         beforeID: insertionTarget(event.currentTarget, event.clientX, draggedItemID),
+                        draggedItemID,
+                        previewWidth: dropPreviewWidth(payload),
                       });
                     }}
                     onDragLeave={(event) => {
@@ -314,26 +349,22 @@ export function TouchBarPreview(props: TouchBarPreviewProps) {
                     }}
                   >
                     {items.length === 0 && !active && <span class="drop-placeholder">{align}</span>}
-                    {active && items.length === 0 && (
-                      <span
-                        class="drop-indicator drop-indicator-empty"
-                        data-testid={`drop-indicator-${align}`}
-                        aria-hidden="true"
-                      />
-                    )}
+                    {active && items.length === 0 && previewSlot(align)}
                     {items.map((item) => (
-                      <PreviewItem
-                        key={item.id}
-                        item={item}
-                        align={align}
-                        selected={props.selectedID === item.id}
-                        simulation={props.simulation}
-                        geometry={geometries.get(item.id)}
-                        onSelect={props.onSelect}
-                        editingLocked={props.editingLocked ?? false}
-                        dropEdge={active ? dropEdgeFor(items, item.id) : undefined}
-                      />
+                      <Fragment key={item.id}>
+                        {active && dropTarget?.beforeID === item.id && previewSlot(align)}
+                        <PreviewItem
+                          item={item}
+                          selected={props.selectedID === item.id}
+                          simulation={props.simulation}
+                          geometry={geometries.get(item.id)}
+                          onSelect={props.onSelect}
+                          editingLocked={props.editingLocked ?? false}
+                          previewScale={scale}
+                        />
+                      </Fragment>
                     ))}
+                    {active && items.length > 0 && dropTarget?.beforeID === undefined && previewSlot(align)}
                   </div>
                 );
               })}

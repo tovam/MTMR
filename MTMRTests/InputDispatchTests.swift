@@ -1,4 +1,4 @@
-import Foundation
+import AppKit
 import XCTest
 
 final class InputDispatchTests: XCTestCase {
@@ -18,6 +18,45 @@ final class InputDispatchTests: XCTestCase {
         XCTAssertEqual(frames[1].maxX, frames[2].minX, accuracy: 0.001)
         XCTAssertEqual(frames[2].maxX, width, accuracy: 0.001)
         XCTAssertTrue(frames.allSatisfy { abs($0.width - width / 3) < 0.001 })
+    }
+
+    @MainActor
+    func testCenterItemsHugTheirContentAtThePhysicalMidpoint() {
+        func fixedItem(_ identifier: String, width: CGFloat) -> NSTouchBarItem {
+            let item = NSCustomTouchBarItem(identifier: .init(identifier))
+            let view = NSView()
+            view.widthAnchor.constraint(equalToConstant: width).isActive = true
+            view.heightAnchor.constraint(equalToConstant: 30).isActive = true
+            item.view = view
+            return item
+        }
+
+        let center = ScrollViewItem(
+            identifier: .init("center-layout-test"),
+            items: [
+                fixedItem("center-a", width: 40),
+                fixedItem("center-b", width: 60),
+            ]
+        )
+        let basicView = BasicView(
+            identifier: .init("basic-layout-test"),
+            leftItems: [],
+            centerItems: [center],
+            rightItems: [],
+            swipeItems: []
+        )
+        basicView.view.frame = NSRect(
+            x: 0,
+            y: 0,
+            width: TouchBarPhysicalLayout.preferredWidth,
+            height: TouchBarPhysicalLayout.preferredHeight
+        )
+        basicView.view.layoutSubtreeIfNeeded()
+
+        let frame = center.view.convert(center.view.bounds, to: basicView.view)
+        XCTAssertEqual(frame.width, 101, accuracy: 0.001)
+        XCTAssertEqual(frame.midX, TouchBarPhysicalLayout.preferredWidth / 2, accuracy: 0.5)
+        XCTAssertLessThan(frame.width, TouchBarPhysicalLayout.preferredWidth / 3)
     }
 
     func testLongTapReleaseIsNotAlsoCountedAsASingleTap() {
