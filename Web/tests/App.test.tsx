@@ -250,6 +250,7 @@ describe("éditeur MMTMR", () => {
 
     fireEvent.dragStart(item);
     fireEvent.dragOver(right);
+    expect(within(right).getByTestId("drop-indicator-right")).toHaveClass("drop-indicator-empty");
     fireEvent.drop(right);
 
     await waitFor(() => expect(within(right).getByRole("button", { name: "Bonjour" })).toBeInTheDocument());
@@ -258,6 +259,65 @@ describe("éditeur MMTMR", () => {
       const put = vi.mocked(fetch).mock.calls.find(([, init]) => init?.method === "PUT");
       const source = JSON.parse(String(put?.[1]?.body)).source as string;
       expect(JSON.parse(source).items[0].align).toBe("right");
+    }, { timeout: 2_000 });
+  });
+
+  it("affiche et respecte la position exacte d’insertion entre deux éléments", async () => {
+    const originalFetch = vi.mocked(fetch).getMockImplementation()!;
+    const orderedConfig = {
+      ...config,
+      items: [
+        config.items[0],
+        { id: "alpha", type: "staticButton", title: "Alpha", align: "center", enabled: true },
+        { id: "omega", type: "staticButton", title: "Omega", align: "center", enabled: true },
+      ],
+    };
+    vi.mocked(fetch).mockImplementation(async (input, init) => {
+      if (String(input).endsWith("/config") && init?.method !== "PUT") {
+        return jsonResponse({ source: `${JSON.stringify(orderedConfig, null, 2)}\n`, document: orderedConfig, revision: 4, diagnostics: [], valid: true });
+      }
+      return originalFetch(input, init);
+    });
+
+    render(<App />);
+    const dragged = await screen.findByRole("button", { name: "Bonjour" });
+    const center = screen.getByTestId("drop-center");
+    const alpha = within(center).getByRole("button", { name: "Alpha" });
+    const omega = within(center).getByRole("button", { name: "Omega" });
+    const bounds = (left: number, width: number) => ({
+      x: left,
+      y: 0,
+      left,
+      right: left + width,
+      top: 0,
+      bottom: 34,
+      width,
+      height: 34,
+      toJSON: () => ({}),
+    }) as DOMRect;
+    vi.spyOn(alpha, "getBoundingClientRect").mockReturnValue(bounds(100, 40));
+    vi.spyOn(omega, "getBoundingClientRect").mockReturnValue(bounds(150, 40));
+
+    fireEvent.dragStart(dragged);
+    const dragOver = new Event("dragover", { bubbles: true, cancelable: true });
+    Object.defineProperties(dragOver, {
+      clientX: { value: 145 },
+      clientY: { value: 17 },
+    });
+    fireEvent(center, dragOver);
+    expect(within(omega).getByTestId("drop-indicator-center")).toHaveClass("drop-indicator-before");
+    fireEvent.drop(center);
+
+    await waitFor(() => {
+      expect(within(center).getAllByRole("button").map((button) => button.getAttribute("aria-label")))
+        .toEqual(["Alpha", "Bonjour", "Omega"]);
+    });
+    await waitFor(() => {
+      const put = vi.mocked(fetch).mock.calls.find(([, init]) => init?.method === "PUT");
+      const source = JSON.parse(String(put?.[1]?.body)).source as string;
+      const saved = JSON.parse(source) as typeof orderedConfig;
+      expect(saved.items.map((item) => item.id)).toEqual(["alpha", "hello", "omega"]);
+      expect(saved.items.find((item) => item.id === "hello")?.align).toBe("center");
     }, { timeout: 2_000 });
   });
 

@@ -24,6 +24,29 @@ interface TouchBarPreviewProps {
   onAdd(item: ItemConfig, align: Alignment, beforeID?: string): void;
 }
 
+interface DropIndicatorTarget {
+  align: Alignment;
+  beforeID?: string;
+}
+
+function insertionTarget(
+  zone: HTMLDivElement,
+  clientX: number,
+  draggedItemID?: string,
+): string | undefined {
+  const items = Array.from(zone.children).filter((child): child is HTMLElement => (
+    child instanceof HTMLElement
+    && child.classList.contains("touch-item")
+    && child.dataset.itemId !== draggedItemID
+  ));
+
+  for (const item of items) {
+    const bounds = item.getBoundingClientRect();
+    if (clientX < bounds.left + bounds.width / 2) return item.dataset.itemId;
+  }
+  return undefined;
+}
+
 function dropHandler(
   event: DragEvent,
   align: Alignment,
@@ -67,25 +90,21 @@ function configuredImageDataURL(item: ItemConfig): string | undefined {
 function PreviewItem({
   item,
   align,
-  schema,
   selected,
   simulation,
   geometry,
   onSelect,
-  onMove,
-  onAdd,
   editingLocked,
+  dropEdge,
 }: {
   item: ItemConfig;
   align: Alignment;
-  schema?: JsonSchema;
   selected: boolean;
   simulation: SimulationContext;
   geometry?: RuntimeItemGeometry;
   onSelect(id: string): void;
-  onMove: TouchBarPreviewProps["onMove"];
-  onAdd: TouchBarPreviewProps["onAdd"];
   editingLocked: boolean;
+  dropEdge?: "before" | "after";
 }) {
   const kind = geometry?.kind ?? item.type;
   const presentation = itemPresentation(kind);
@@ -111,6 +130,7 @@ function PreviewItem({
       class={`touch-item ${renderedImage ? "has-native-render" : ""} ${selected ? "is-selected" : ""} ${item.enabled === false ? "is-disabled" : ""}`}
       style={sizeStyle}
       data-kind={kind}
+      data-item-id={item.id}
       draggable={!editingLocked}
       onDragStart={(event) => {
         if (editingLocked) {
@@ -120,16 +140,18 @@ function PreviewItem({
         setDragPayload(event, { kind: "item", id: item.id });
       }}
       onDragEnd={clearDragPayload}
-      onDragOver={(event) => {
-        event.preventDefault();
-        if (event.dataTransfer) event.dataTransfer.dropEffect = "move";
-      }}
-      onDrop={(event) => dropHandler(event, align, schema, onMove, onAdd, editingLocked, item.id)}
       onClick={() => onSelect(item.id)}
       aria-pressed={selected}
       aria-label={displayedTitle || presentation.label}
       title={`${itemLabel(item)} · ${item.type}`}
     >
+      {dropEdge && (
+        <span
+          class={`drop-indicator drop-indicator-${dropEdge}`}
+          data-testid={`drop-indicator-${align}`}
+          aria-hidden="true"
+        />
+      )}
       {renderedImage ? (
         <img class="touch-item-image touch-item-complete-render" src={renderedImage} alt="" aria-hidden="true" draggable={false} />
       ) : (
@@ -151,6 +173,14 @@ export function TouchBarPreview(props: TouchBarPreviewProps) {
   const fitRef = useRef<HTMLDivElement>(null);
   const trackRef = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(1);
+  const [dropTarget, setDropTarget] = useState<DropIndicatorTarget>();
+  const dropTargetRef = useRef<DropIndicatorTarget>();
+  const updateDropTarget = (target?: DropIndicatorTarget) => {
+    const current = dropTargetRef.current;
+    if (current?.align === target?.align && current?.beforeID === target?.beforeID) return;
+    dropTargetRef.current = target;
+    setDropTarget(target);
+  };
   const snapshotContext = props.runtimeSnapshot?.context;
   const runtimeInputAccess = snapshotContext && typeof snapshotContext === "object" && !Array.isArray(snapshotContext)
     && typeof snapshotContext.inputAccess === "boolean"
@@ -198,6 +228,15 @@ export function TouchBarPreview(props: TouchBarPreviewProps) {
     observer?.observe(track);
     return () => observer?.disconnect();
   }, [props.document, props.runtimeSnapshot]);
+  useEffect(() => {
+    const clear = () => updateDropTarget(undefined);
+    window.addEventListener("dragend", clear);
+    window.addEventListener("drop", clear);
+    return () => {
+      window.removeEventListener("dragend", clear);
+      window.removeEventListener("drop", clear);
+    };
+  }, []);
   const byAlignment = (align: Alignment) => props.document.items
     .filter((item) => geometries.get(item.id)?.visible !== false && (geometries.get(item.id)?.align ?? item.align ?? "left") === align)
     .sort((left, right) => {
@@ -205,6 +244,11 @@ export function TouchBarPreview(props: TouchBarPreviewProps) {
       const rightX = geometries.get(right.id)?.x;
       return typeof leftX === "number" && typeof rightX === "number" ? leftX - rightX : 0;
     });
+  const dropEdgeFor = (items: ItemConfig[], itemID: string): "before" | "after" | undefined => {
+    if (dropTarget?.beforeID === itemID) return "before";
+    if (dropTarget?.beforeID === undefined && items.at(-1)?.id === itemID) return "after";
+    return undefined;
+  };
   return (
     <section class={`preview-shell preview-theme-${props.simulation.theme}`} data-theme={props.simulation.theme} aria-label="Aperçu de la Touch Bar">
       <div class="section-title-row">
@@ -233,42 +277,66 @@ export function TouchBarPreview(props: TouchBarPreviewProps) {
         <div class="touchbar-frame">
           <div class="touchbar-fit" ref={fitRef}>
             <div class="touchbar-track" ref={trackRef} style={{ transform: `scale(${scale})` }}>
-              {(["left", "center", "right"] as Alignment[]).map((align) => (
-                <div
-                  class={`drop-zone drop-zone-${align}`}
-                  data-testid={`drop-${align}`}
-                  data-align={align}
-                  key={align}
-                  onDragOver={(event) => {
-                    if (props.editingLocked) return;
-                    event.preventDefault();
-                    if (event.dataTransfer) event.dataTransfer.dropEffect = "move";
-                    event.currentTarget.classList.add("drag-over");
-                  }}
-                  onDragLeave={(event) => event.currentTarget.classList.remove("drag-over")}
-                  onDrop={(event) => {
-                    event.currentTarget.classList.remove("drag-over");
-                    dropHandler(event, align, props.schema, props.onMove, props.onAdd, props.editingLocked);
-                  }}
-                >
-                  {byAlignment(align).length === 0 && <span class="drop-placeholder">{align}</span>}
-                  {byAlignment(align).map((item) => (
-                    <PreviewItem
-                      key={item.id}
-                      item={item}
-                      align={align}
-                      schema={props.schema}
-                      selected={props.selectedID === item.id}
-                      simulation={props.simulation}
-                      geometry={geometries.get(item.id)}
-                      onSelect={props.onSelect}
-                      onMove={props.onMove}
-                      onAdd={props.onAdd}
-                      editingLocked={props.editingLocked ?? false}
-                    />
-                  ))}
-                </div>
-              ))}
+              {(["left", "center", "right"] as Alignment[]).map((align) => {
+                const items = byAlignment(align);
+                const active = dropTarget?.align === align;
+                return (
+                  <div
+                    class={`drop-zone drop-zone-${align} ${active ? "drag-over" : ""}`}
+                    data-testid={`drop-${align}`}
+                    data-align={align}
+                    key={align}
+                    onDragOver={(event) => {
+                      if (props.editingLocked) return;
+                      event.preventDefault();
+                      if (event.dataTransfer) event.dataTransfer.dropEffect = "move";
+                      const payload = getDragPayload(event);
+                      const draggedItemID = payload?.kind === "item" ? payload.id : undefined;
+                      updateDropTarget({
+                        align,
+                        beforeID: insertionTarget(event.currentTarget, event.clientX, draggedItemID),
+                      });
+                    }}
+                    onDragLeave={(event) => {
+                      const related = event.relatedTarget;
+                      if (related instanceof Node && event.currentTarget.contains(related)) return;
+                      const bounds = event.currentTarget.getBoundingClientRect();
+                      const stillInside = event.clientX >= bounds.left && event.clientX <= bounds.right
+                        && event.clientY >= bounds.top && event.clientY <= bounds.bottom;
+                      if (!stillInside) updateDropTarget(undefined);
+                    }}
+                    onDrop={(event) => {
+                      const beforeID = dropTargetRef.current?.align === align
+                        ? dropTargetRef.current.beforeID
+                        : undefined;
+                      updateDropTarget(undefined);
+                      dropHandler(event, align, props.schema, props.onMove, props.onAdd, props.editingLocked, beforeID);
+                    }}
+                  >
+                    {items.length === 0 && !active && <span class="drop-placeholder">{align}</span>}
+                    {active && items.length === 0 && (
+                      <span
+                        class="drop-indicator drop-indicator-empty"
+                        data-testid={`drop-indicator-${align}`}
+                        aria-hidden="true"
+                      />
+                    )}
+                    {items.map((item) => (
+                      <PreviewItem
+                        key={item.id}
+                        item={item}
+                        align={align}
+                        selected={props.selectedID === item.id}
+                        simulation={props.simulation}
+                        geometry={geometries.get(item.id)}
+                        onSelect={props.onSelect}
+                        editingLocked={props.editingLocked ?? false}
+                        dropEdge={active ? dropEdgeFor(items, item.id) : undefined}
+                      />
+                    ))}
+                  </div>
+                );
+              })}
             </div>
           </div>
         </div>
