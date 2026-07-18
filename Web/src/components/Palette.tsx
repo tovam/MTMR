@@ -2,6 +2,7 @@ import { useRef, useState } from "preact/hooks";
 import { schemaItemTypes } from "../model";
 import type { PaletteItemPresentation } from "../model";
 import type { JsonSchema } from "../types";
+import { BrightnessIcon, brightnessDirectionForType } from "./BrightnessIcon";
 
 export const DRAG_TYPE = "application/x-mmtmr-item";
 
@@ -9,23 +10,38 @@ export type DragPayload =
   | { kind: "palette"; type: string }
   | { kind: "item"; id: string };
 
+let activeDragPayload: DragPayload | undefined;
+
 export function setDragPayload(event: DragEvent, payload: DragPayload) {
+  activeDragPayload = payload;
   if (!event.dataTransfer) return;
   const serialized = JSON.stringify(payload);
   event.dataTransfer.effectAllowed = payload.kind === "palette" ? "copy" : "move";
-  event.dataTransfer.setData(DRAG_TYPE, serialized);
-  event.dataTransfer.setData("text/plain", serialized);
+  try {
+    event.dataTransfer.setData(DRAG_TYPE, serialized);
+    event.dataTransfer.setData("text/plain", serialized);
+  } catch {
+    // Some WebKit versions reject custom drag types. The in-memory payload is
+    // deliberately kept until dragend/drop so moving between MMTMR zones works.
+  }
 }
 
 export function getDragPayload(event: DragEvent): DragPayload | undefined {
-  if (!event.dataTransfer) return undefined;
-  const raw = event.dataTransfer.getData(DRAG_TYPE) || event.dataTransfer.getData("text/plain");
-  try {
-    const value = JSON.parse(raw) as DragPayload;
-    return value.kind === "palette" || value.kind === "item" ? value : undefined;
-  } catch {
-    return undefined;
+  if (event.dataTransfer) {
+    try {
+      const raw = event.dataTransfer.getData(DRAG_TYPE) || event.dataTransfer.getData("text/plain");
+      const value = JSON.parse(raw) as DragPayload;
+      if (value.kind === "palette" && typeof value.type === "string") return value;
+      if (value.kind === "item" && typeof value.id === "string") return value;
+    } catch {
+      // Falling back to the payload captured at dragstart is intentional.
+    }
   }
+  return activeDragPayload;
+}
+
+export function clearDragPayload() {
+  activeDragPayload = undefined;
 }
 
 interface PaletteProps {
@@ -34,6 +50,11 @@ interface PaletteProps {
   editingLocked?: boolean;
   onToggle(): void;
   onAdd(type: string): void;
+}
+
+function PaletteEntryIcon({ entry }: { entry: PaletteItemPresentation }) {
+  const direction = brightnessDirectionForType(entry.type);
+  return direction ? <BrightnessIcon direction={direction} /> : <>{entry.icon}</>;
 }
 
 export function Palette({ schema, collapsed, editingLocked = false, onToggle, onAdd }: PaletteProps) {
@@ -70,6 +91,7 @@ export function Palette({ schema, collapsed, editingLocked = false, onToggle, on
                 draggable={!editingLocked}
                 disabled={editingLocked}
                 onDragStart={(event) => setDragPayload(event, { kind: "palette", type: entry.type })}
+                onDragEnd={clearDragPayload}
                 onDblClick={() => onAdd(entry.type)}
                 onMouseEnter={(event) => showDetail(entry, event.currentTarget)}
                 onFocus={(event) => showDetail(entry, event.currentTarget)}
@@ -77,7 +99,7 @@ export function Palette({ schema, collapsed, editingLocked = false, onToggle, on
                 title={`Ajouter ${entry.label}`}
                 aria-describedby={`palette-help-${entry.type}`}
               >
-                <span class="palette-icon" aria-hidden="true">{entry.icon}</span>
+                <span class="palette-icon" aria-hidden="true"><PaletteEntryIcon entry={entry} /></span>
                 <span>
                   <strong>{entry.label}</strong>
                   <small>{entry.type}</small>
@@ -96,7 +118,7 @@ export function Palette({ schema, collapsed, editingLocked = false, onToggle, on
           style={{ top: `${detail.top}px` }}
         >
           <div class="palette-popover-heading">
-            <span class="palette-popover-icon" aria-hidden="true">{detail.entry.icon}</span>
+            <span class="palette-popover-icon" aria-hidden="true"><PaletteEntryIcon entry={detail.entry} /></span>
             <div><strong>{detail.entry.label}</strong><code>{detail.entry.type}</code></div>
           </div>
           <p>{detail.entry.description}</p>

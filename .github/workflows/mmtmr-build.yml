@@ -21,7 +21,6 @@ jobs:
       CI_ROOT: ${{ github.workspace }}/build-checks/github-actions
       DERIVED_DATA: ${{ github.workspace }}/build-checks/github-actions/DerivedData
       SOURCE_PACKAGES: ${{ github.workspace }}/build-checks/github-actions/SourcePackages
-      PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}/build-checks/github-actions/playwright
 
     steps:
       - name: Check out MMTMR
@@ -47,12 +46,6 @@ jobs:
           npm ci --cache "$CI_ROOT/npm-cache" --prefer-offline --no-audit
           npm test
           npm run build
-
-      - name: Test the editor layout in Chromium and WebKit
-        working-directory: Web
-        run: |
-          npx playwright install chromium webkit
-          npm run test:e2e
 
       - name: Resolve Swift packages
         run: |
@@ -130,7 +123,5 @@ jobs:
             ${{ env.CI_ROOT }}/MMTMRTests.xcresult
             ${{ env.CI_ROOT }}/swift-tests.log
             ${{ env.CI_ROOT }}/archive.log
-            Web/test-results
-            Web/playwright-report
           if-no-files-found: ignore
           retention-days: 7

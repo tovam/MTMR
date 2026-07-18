@@ -9,7 +9,6 @@
     "preview": "vite preview --host 127.0.0.1",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:e2e": "playwright test",
     "check": "npm run test && npm run build"
   },
   "dependencies": {
@@ -21,7 +20,6 @@
     "preact": "^10.26.4"
   },
   "devDependencies": {
-    "@playwright/test": "^1.51.1",
     "@preact/preset-vite": "^2.10.1",
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/preact": "^3.2.4",

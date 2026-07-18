@@ -1,4 +1,5 @@
 import Foundation
+import CoreGraphics
 
 public enum InputDispatchAction: String, Sendable {
     case unicodeText
@@ -11,6 +12,8 @@ public enum InputDispatchBackendKind: String, Sendable {
     case coreGraphicsKeyboard
     case ioHID
     case coreGraphicsAuxiliary
+    case coreAudio
+    case coreDisplay
 }
 
 public enum InputDispatchStatus: String, Sendable {
@@ -82,6 +85,36 @@ struct TouchTapSequenceState: Equatable, Sendable {
     mutating func reset() {
         clickCount = 0
         suppressNextTouchEnd = false
+    }
+}
+
+enum TouchBarPhysicalZone: Int, CaseIterable, Sendable {
+    case left
+    case center
+    case right
+}
+
+/// The physical Touch Bar is split into three real, equal regions. This keeps
+/// `align` semantic: a large left-side component may compress inside the left
+/// third, but it can no longer push later left items into the right region.
+struct TouchBarPhysicalLayout: Sendable {
+    static let preferredWidth: CGFloat = 1_085
+    static let preferredHeight: CGFloat = 30
+
+    static func frame(
+        for zone: TouchBarPhysicalZone,
+        containerWidth: CGFloat,
+        containerHeight: CGFloat
+    ) -> CGRect {
+        let safeWidth = max(0, containerWidth)
+        let safeHeight = max(0, containerHeight)
+        let zoneWidth = safeWidth / CGFloat(TouchBarPhysicalZone.allCases.count)
+        return CGRect(
+            x: zoneWidth * CGFloat(zone.rawValue),
+            y: 0,
+            width: zoneWidth,
+            height: safeHeight
+        )
     }
 }
 

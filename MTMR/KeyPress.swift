@@ -7,6 +7,9 @@
 //
 
 import Foundation
+import CoreAudio
+import CoreGraphics
+import AudioToolbox
 
 /// Coalesces the macOS privacy prompts used by the concrete input backends.
 /// AppDelegate requests Core Graphics access during launch, so physical taps
@@ -216,11 +219,179 @@ private struct SystemMediaKeyInputBackend: MediaKeyInputBackend {
     }
 }
 
+/// Volume and display brightness are controls, not keyboard input. Driving
+/// their native subsystems first makes the dedicated Touch Bar buttons work
+/// immediately even when macOS has not granted PostEvent/Accessibility access.
+private enum DirectSystemControl {
+    private static let step: Float32 = 1.0 / 16.0
+
+    static func send(keyCode: Int32) -> InputDispatchResult? {
+        switch keyCode {
+        case NX_KEYTYPE_SOUND_DOWN:
+            return adjustVolume(by: -step)
+        case NX_KEYTYPE_SOUND_UP:
+            return adjustVolume(by: step)
+        case NX_KEYTYPE_MUTE:
+            return toggleMute()
+        case NX_KEYTYPE_BRIGHTNESS_DOWN:
+            return adjustBrightness(by: -step)
+        case NX_KEYTYPE_BRIGHTNESS_UP:
+            return adjustBrightness(by: step)
+        default:
+            return nil
+        }
+    }
+
+    private static func adjustVolume(by delta: Float32) -> InputDispatchResult? {
+        guard let device = defaultOutputDevice(),
+              let current = readFloatProperty(
+                  device: device,
+                  selector: kAudioHardwareServiceDeviceProperty_VirtualMainVolume
+              )
+        else { return nil }
+
+        let next = min(1, max(0, current + delta))
+        let volumeStatus = writeFloatProperty(
+            next,
+            device: device,
+            selector: kAudioHardwareServiceDeviceProperty_VirtualMainVolume
+        )
+        guard volumeStatus == noErr else { return nil }
+
+        // Match the system volume keys: zero mutes and raising the volume
+        // releases mute. A device without a writable mute property is still a
+        // successful volume adjustment.
+        _ = writeUInt32Property(next == 0 ? 1 : 0, device: device, selector: kAudioDevicePropertyMute)
+        return InputDispatchResult(
+            action: .mediaKey,
+            backend: .coreAudio,
+            status: .success,
+            message: "The output volume was changed directly through Core Audio."
+        )
+    }
+
+    private static func toggleMute() -> InputDispatchResult? {
+        guard let device = defaultOutputDevice(),
+              let current = readUInt32Property(device: device, selector: kAudioDevicePropertyMute)
+        else { return nil }
+        let status = writeUInt32Property(current == 0 ? 1 : 0, device: device, selector: kAudioDevicePropertyMute)
+        guard status == noErr else { return nil }
+        return InputDispatchResult(
+            action: .mediaKey,
+            backend: .coreAudio,
+            status: .success,
+            message: "Output mute was changed directly through Core Audio."
+        )
+    }
+
+    private static func adjustBrightness(by delta: Float32) -> InputDispatchResult? {
+        let displayID = CGMainDisplayID()
+        let current = CoreDisplay_Display_GetUserBrightness(Int32(bitPattern: displayID))
+        guard current.isFinite, current >= 0, current <= 1 else { return nil }
+        let next = min(1, max(0, current + Double(delta)))
+        CoreDisplay_Display_SetUserBrightness(Int32(bitPattern: displayID), next)
+        return InputDispatchResult(
+            action: .mediaKey,
+            backend: .coreDisplay,
+            status: .success,
+            message: "Display brightness was changed directly through CoreDisplay."
+        )
+    }
+
+    private static func defaultOutputDevice() -> AudioObjectID? {
+        var device = AudioObjectID(0)
+        var size = UInt32(MemoryLayout.size(ofValue: device))
+        var address = AudioObjectPropertyAddress(
+            mSelector: kAudioHardwarePropertyDefaultOutputDevice,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
+        let status = AudioObjectGetPropertyData(
+            AudioObjectID(kAudioObjectSystemObject),
+            &address,
+            0,
+            nil,
+            &size,
+            &device
+        )
+        return status == noErr && device != 0 ? device : nil
+    }
+
+    private static func readFloatProperty(
+        device: AudioObjectID,
+        selector: AudioObjectPropertySelector
+    ) -> Float32? {
+        var value = Float32.zero
+        var size = UInt32(MemoryLayout.size(ofValue: value))
+        var address = outputAddress(selector: selector)
+        let status = AudioObjectGetPropertyData(device, &address, 0, nil, &size, &value)
+        return status == noErr && value.isFinite ? value : nil
+    }
+
+    private static func writeFloatProperty(
+        _ value: Float32,
+        device: AudioObjectID,
+        selector: AudioObjectPropertySelector
+    ) -> OSStatus {
+        var value = value
+        var address = outputAddress(selector: selector)
+        return AudioObjectSetPropertyData(
+            device,
+            &address,
+            0,
+            nil,
+            UInt32(MemoryLayout.size(ofValue: value)),
+            &value
+        )
+    }
+
+    private static func readUInt32Property(
+        device: AudioObjectID,
+        selector: AudioObjectPropertySelector
+    ) -> UInt32? {
+        var value = UInt32.zero
+        var size = UInt32(MemoryLayout.size(ofValue: value))
+        var address = outputAddress(selector: selector)
+        let status = AudioObjectGetPropertyData(device, &address, 0, nil, &size, &value)
+        return status == noErr ? value : nil
+    }
+
+    private static func writeUInt32Property(
+        _ value: UInt32,
+        device: AudioObjectID,
+        selector: AudioObjectPropertySelector
+    ) -> OSStatus {
+        var value = value
+        var address = outputAddress(selector: selector)
+        return AudioObjectSetPropertyData(
+            device,
+            &address,
+            0,
+            nil,
+            UInt32(MemoryLayout.size(ofValue: value)),
+            &value
+        )
+    }
+
+    private static func outputAddress(
+        selector: AudioObjectPropertySelector
+    ) -> AudioObjectPropertyAddress {
+        AudioObjectPropertyAddress(
+            mSelector: selector,
+            mScope: kAudioDevicePropertyScopeOutput,
+            mElement: kAudioObjectPropertyElementMain
+        )
+    }
+}
+
 @discardableResult
 func HIDPostAuxKey(
     _ key: Int32,
     backend: any MediaKeyInputBackend = SystemMediaKeyInputBackend()
 ) -> InputDispatchResult {
+    if let directResult = DirectSystemControl.send(keyCode: key) {
+        return InputDispatchDiagnostics.publish(directResult)
+    }
     guard let keyCode = UInt8(exactly: key) else {
         return InputDispatchDiagnostics.publish(InputDispatchResult(
             action: .mediaKey,

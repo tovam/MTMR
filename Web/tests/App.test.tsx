@@ -243,6 +243,24 @@ describe("éditeur MMTMR", () => {
     await waitFor(() => expect(within(center).getByRole("button", { name: "Nouveau" })).toBeInTheDocument());
   });
 
+  it("déplace un élément existant entre zones même sans DataTransfer exploitable", async () => {
+    render(<App />);
+    const item = await screen.findByRole("button", { name: "Bonjour" });
+    const right = screen.getByTestId("drop-right");
+
+    fireEvent.dragStart(item);
+    fireEvent.dragOver(right);
+    fireEvent.drop(right);
+
+    await waitFor(() => expect(within(right).getByRole("button", { name: "Bonjour" })).toBeInTheDocument());
+    expect(within(screen.getByTestId("drop-left")).queryByRole("button", { name: "Bonjour" })).not.toBeInTheDocument();
+    await waitFor(() => {
+      const put = vi.mocked(fetch).mock.calls.find(([, init]) => init?.method === "PUT");
+      const source = JSON.parse(String(put?.[1]?.body)).source as string;
+      expect(JSON.parse(source).items[0].align).toBe("right");
+    }, { timeout: 2_000 });
+  });
+
   it("enregistre automatiquement un formulaire valide après debounce", async () => {
     const user = userEvent.setup();
     render(<App />);
@@ -533,6 +551,7 @@ describe("éditeur MMTMR", () => {
       payload: { items: [], context: { inputAccess: false } },
     });
     expect(await screen.findByRole("alert")).toHaveTextContent("Réglages > Accessibilité");
+    expect(screen.getByRole("alert")).toHaveTextContent("saisir les lettres");
     await user.click(screen.getByRole("tab", { name: "Aperçu" }));
     await user.click(screen.getByRole("button", { name: "Personnalisé" }));
     expect(screen.getByRole("alert")).toHaveTextContent("Réglages > Accessibilité");

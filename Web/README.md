@@ -9,8 +9,6 @@ npm install
 npm run dev
 npm run build
 npm test
-npx playwright install chromium webkit
-npm run test:e2e
 ```
 
 Le build de production est écrit dans `Web/dist/`. En développement, Vite écoute sur `127.0.0.1:5173` et relaie `/api` vers `127.0.0.1:8787`.

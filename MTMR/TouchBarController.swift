@@ -19,6 +19,7 @@ struct RuntimeBarItem {
 struct RuntimeBarGeometry: Sendable {
     let id: String
     let align: String
+    let x: Double?
     let width: Double
     let height: Double
     let visible: Bool
@@ -250,11 +251,22 @@ class TouchBarController: NSObject, NSTouchBarDelegate {
             items[identifier]
         })
 
-        let visibleItems = leftItems + [scrollArea] + rightItems
+        let visibleCenterItems: [NSTouchBarItem] = centerItems.isEmpty ? [] : [scrollArea]
         if let basicView {
-            basicView.update(items: visibleItems, swipeItems: swipeItems)
+            basicView.update(
+                leftItems: leftItems,
+                centerItems: visibleCenterItems,
+                rightItems: rightItems,
+                swipeItems: swipeItems
+            )
         } else {
-            basicView = BasicView(identifier: basicViewIdentifier, items: visibleItems, swipeItems: swipeItems)
+            basicView = BasicView(
+                identifier: basicViewIdentifier,
+                leftItems: leftItems,
+                centerItems: visibleCenterItems,
+                rightItems: rightItems,
+                swipeItems: swipeItems
+            )
         }
         basicView?.legacyGesturesEnabled = AppSettings.multitouchGestures
     }
@@ -372,7 +384,8 @@ class TouchBarController: NSObject, NSTouchBarDelegate {
             else { return nil }
             let item = items[identifier] ?? swipeItems.first(where: { $0.identifier == identifier })
             let view = item?.view
-            let size = runtimeSize(of: view)
+            let frame = runtimeFrame(of: view)
+            let size = frame?.size ?? runtimeSize(of: view)
             let title = runtimeTitle(for: item, view: view)
             let signature = runtimeRenderSignature(
                 identifier: identifier,
@@ -385,6 +398,7 @@ class TouchBarController: NSObject, NSTouchBarDelegate {
             return RuntimeBarGeometry(
                 id: id,
                 align: definition.align.rawValue,
+                x: frame.map { Double($0.minX) },
                 width: Double(size.width),
                 height: Double(size.height),
                 visible: item != nil,
@@ -394,6 +408,18 @@ class TouchBarController: NSObject, NSTouchBarDelegate {
                 renderedImageChanged: render.changed
             )
         }
+    }
+
+    private func runtimeFrame(of view: NSView?) -> NSRect? {
+        guard let view, let rootView = basicView?.view else { return nil }
+        rootView.layoutSubtreeIfNeeded()
+        view.layoutSubtreeIfNeeded()
+        let frame = view.convert(view.bounds, to: rootView)
+        guard frame.origin.x.isFinite, frame.origin.y.isFinite,
+              frame.width.isFinite, frame.height.isFinite,
+              frame.width > 0, frame.height > 0
+        else { return nil }
+        return frame
     }
 
     private func runtimeSize(of view: NSView?) -> NSSize {

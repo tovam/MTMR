@@ -584,6 +584,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 "visible": .bool(item.visible),
                 "kind": .string(item.kind),
             ]
+            if let x = item.x {
+                object["x"] = .number(x)
+            }
             if let title = item.title {
                 object["title"] = .string(title)
             }
@@ -601,6 +604,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 "visible": .bool(item.visible),
                 "kind": .string(item.kind),
             ]
+            if let x = item.x {
+                object["x"] = .number(x)
+            }
             object["title"] = item.title.map { .string($0) } ?? .null
             if item.renderedImageChanged {
                 object["renderedImage"] = item.renderedImage.map { .string($0) } ?? .null
@@ -688,8 +694,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let inputAccessGranted = CGPreflightPostEventAccess()
         let inputAccessItem = NSMenuItem(
             title: inputAccessGranted
-                ? "Commandes système : autorisées"
-                : "⚠︎ Autoriser lettres, volume et luminosité…",
+                ? "Saisie Unicode : autorisée"
+                : "⚠︎ Autoriser la saisie Unicode…",
             action: inputAccessGranted ? nil : #selector(requestSystemInputAccess(_:)),
             keyEquivalent: ""
         )

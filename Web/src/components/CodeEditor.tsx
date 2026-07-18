@@ -47,14 +47,14 @@ export function CodeEditor({ value, onChange, label = "Configuration JSON" }: Co
           }
         }),
         EditorView.theme({
-          "&": { height: "100%", backgroundColor: "transparent" },
+          "&": { height: "100%", color: "#20252a", backgroundColor: "#f8f9fa" },
           ".cm-scroller": { overflow: "auto", fontFamily: "var(--font-mono)" },
-          ".cm-content": { padding: "12px 0", caretColor: "#8bc5ff" },
-          ".cm-gutters": { backgroundColor: "#101318", color: "#58606b", border: "none" },
-          ".cm-activeLine": { backgroundColor: "rgba(92, 161, 255, .065)" },
-          ".cm-activeLineGutter": { backgroundColor: "rgba(92, 161, 255, .08)", color: "#a9b2bd" },
-          ".cm-selectionBackground, &.cm-focused .cm-selectionBackground": { backgroundColor: "#284c72" },
-        }, { dark: true }),
+          ".cm-content": { padding: "12px 0", caretColor: "#0a64bd" },
+          ".cm-gutters": { backgroundColor: "#e2e4e6", color: "#737b82", borderRight: "1px solid #c8cccf" },
+          ".cm-activeLine": { backgroundColor: "rgba(10, 100, 189, .065)" },
+          ".cm-activeLineGutter": { backgroundColor: "#d5e5f4", color: "#39434b" },
+          ".cm-selectionBackground, &.cm-focused .cm-selectionBackground": { backgroundColor: "#b8d6f2" },
+        }, { dark: false }),
       ],
     });
     view.current = new EditorView({ state, parent: host.current });

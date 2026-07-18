@@ -20,7 +20,7 @@ export interface PaletteItemPresentation {
 
 export const FALLBACK_ITEM_TYPES: readonly PaletteItemPresentation[] = [
   { type: "staticButton", label: "Bouton statique", icon: "Aa", description: "Affiche un libellé fixe et déclenche une ou plusieurs actions. Idéal pour saisir un caractère ou lancer une commande.", examples: ["ž / Ž", "Ouvrir une URL", "Raccourci"] },
-  { type: "appleScriptTitledButton", label: "Titre AppleScript", icon: "⌘", description: "Calcule périodiquement le titre avec AppleScript. Le script reste exécuté par MMTMR, jamais par l’aperçu web.", examples: ["État d’une app", "Texte dynamique"] },
+  { type: "appleScriptTitledButton", label: "AppleScript", icon: "⌘", description: "Exécute périodiquement un AppleScript pour afficher une information ou un état. Le script reste exécuté par MMTMR, jamais par l’aperçu web.", examples: ["État d’une app", "Texte dynamique"] },
   { type: "shellScriptTitledButton", label: "Titre Shell", icon: ">_", description: "Calcule périodiquement le titre avec un script shell. Pratique pour une information locale courte.", examples: ["Branche Git", "Statut service"] },
   { type: "timeButton", label: "Heure", icon: "◷", description: "Affiche l’heure selon un format, un fuseau et une locale. L’aperçu direct reprend la valeur fournie par MMTMR.", examples: ["14:32", "sam. 18", "UTC"] },
   { type: "battery", label: "Batterie", icon: "▰", description: "Affiche le niveau et l’état de la batterie du Mac. La valeur réelle arrive par le mode Direct.", examples: ["82 %", "En charge"] },

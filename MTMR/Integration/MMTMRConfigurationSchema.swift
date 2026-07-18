@@ -74,7 +74,7 @@ enum MMTMRConfigurationSchema {
             itemVariant("staticButton", title: "Static button", fields: [
                 "title": stringProperty("Button label.", defaultValue: "Button"),
             ], required: ["title"]),
-            itemVariant("appleScriptTitledButton", title: "AppleScript title", fields: [
+            itemVariant("appleScriptTitledButton", title: "AppleScript", fields: [
                 "source": reference("#/$defs/source"),
                 "refreshInterval": numberProperty(defaultValue: 1800, minimum: 0.001),
                 "alternativeImages": .object([

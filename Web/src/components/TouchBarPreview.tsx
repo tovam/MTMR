@@ -9,7 +9,8 @@ import type {
   RuntimeItemGeometry,
   SimulationContext,
 } from "../types";
-import { getDragPayload, setDragPayload } from "./Palette";
+import { clearDragPayload, getDragPayload, setDragPayload } from "./Palette";
+import { BrightnessIcon, brightnessDirectionForType } from "./BrightnessIcon";
 
 interface TouchBarPreviewProps {
   document: ConfigDocument;
@@ -36,6 +37,7 @@ function dropHandler(
   event.preventDefault();
   event.stopPropagation();
   const payload = getDragPayload(event);
+  clearDragPayload();
   if (!payload) return;
   if (payload.kind === "item") onMove(payload.id, align, beforeID);
   else onAdd(createItem(payload.type, schema), align, beforeID);
@@ -87,6 +89,7 @@ function PreviewItem({
 }) {
   const kind = geometry?.kind ?? item.type;
   const presentation = itemPresentation(kind);
+  const brightnessDirection = brightnessDirectionForType(kind);
   const fallbackTitle = displayTitle(item, simulation);
   const displayedTitle = typeof geometry?.title === "string" ? geometry.title : fallbackTitle;
   const renderedImage = typeof geometry?.renderedImage === "string" && geometry.renderedImage.startsWith("data:image/")
@@ -116,6 +119,7 @@ function PreviewItem({
         }
         setDragPayload(event, { kind: "item", id: item.id });
       }}
+      onDragEnd={clearDragPayload}
       onDragOver={(event) => {
         event.preventDefault();
         if (event.dataTransfer) event.dataTransfer.dropEffect = "move";
@@ -127,11 +131,15 @@ function PreviewItem({
       title={`${itemLabel(item)} · ${item.type}`}
     >
       {renderedImage ? (
-        <img class="touch-item-image touch-item-complete-render" src={renderedImage} alt="" aria-hidden="true" />
+        <img class="touch-item-image touch-item-complete-render" src={renderedImage} alt="" aria-hidden="true" draggable={false} />
       ) : (
         <>
-          {configuredImage && <img class="touch-item-image touch-item-config-image" src={configuredImage} alt="" aria-hidden="true" />}
-          {showFallbackIcon && <span class="touch-item-symbol" aria-hidden="true">{presentation.icon}</span>}
+          {configuredImage && <img class="touch-item-image touch-item-config-image" src={configuredImage} alt="" aria-hidden="true" draggable={false} />}
+          {showFallbackIcon && (
+            <span class="touch-item-symbol" aria-hidden="true">
+              {brightnessDirection ? <BrightnessIcon direction={brightnessDirection} /> : presentation.icon}
+            </span>
+          )}
           {displayedTitle && <span class="touch-item-label">{displayedTitle}</span>}
         </>
       )}
@@ -208,7 +216,7 @@ export function TouchBarPreview(props: TouchBarPreviewProps) {
         <div class="preview-meta">
           {runtimeInputAccess === false && (
             <span class="input-access-warning" role="alert">
-              Autorisez MMTMR dans Réglages &gt; Accessibilité pour les lettres, volume et luminosité.
+              Autorisez MMTMR dans Réglages &gt; Accessibilité pour saisir les lettres dans les autres apps.
             </span>
           )}
           <div class="preview-context">

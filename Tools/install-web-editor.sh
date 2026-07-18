@@ -25,7 +25,10 @@ mkdir -p "$editor_destination"
 ditto "$project_root/Web/dist" "$editor_destination"
 
 if [ -n "$signing_identity" ]; then
-    codesign --force --deep --sign "$signing_identity" "$app_path"
+    # The bundled frameworks already carry their archive signatures. Only the
+    # outer resource seal changed, so signing recursively would needlessly ask
+    # Keychain for the same private key once per nested component.
+    codesign --force --timestamp=none --sign "$signing_identity" "$app_path"
     codesign --verify --deep --strict --verbose=2 "$app_path"
     echo "Editor installed and application signed: $app_path"
 else

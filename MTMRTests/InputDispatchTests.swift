@@ -2,6 +2,24 @@ import Foundation
 import XCTest
 
 final class InputDispatchTests: XCTestCase {
+    func testPhysicalTouchBarAlignmentUsesThreeEqualNonOverlappingZones() {
+        let width = TouchBarPhysicalLayout.preferredWidth
+        let height = TouchBarPhysicalLayout.preferredHeight
+        let frames = TouchBarPhysicalZone.allCases.map {
+            TouchBarPhysicalLayout.frame(
+                for: $0,
+                containerWidth: width,
+                containerHeight: height
+            )
+        }
+
+        XCTAssertEqual(frames[0].minX, 0, accuracy: 0.001)
+        XCTAssertEqual(frames[0].maxX, frames[1].minX, accuracy: 0.001)
+        XCTAssertEqual(frames[1].maxX, frames[2].minX, accuracy: 0.001)
+        XCTAssertEqual(frames[2].maxX, width, accuracy: 0.001)
+        XCTAssertTrue(frames.allSatisfy { abs($0.width - width / 3) < 0.001 })
+    }
+
     func testLongTapReleaseIsNotAlsoCountedAsASingleTap() {
         var state = TouchTapSequenceState()
 
