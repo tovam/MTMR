@@ -41,14 +41,18 @@ const DEFAULT_SIMULATION: SimulationContext = {
   time: "12:34",
 };
 
-function eventDetail(payload: unknown): string {
-  if (payload === undefined) return "";
-  if (typeof payload === "string") return payload;
-  try {
-    return JSON.stringify(payload);
-  } catch {
-    return String(payload);
+function eventDetail(type: string, payload: unknown): string {
+  if (type === "server.error" && isRecord(payload) && typeof payload.code === "string" && payload.code.startsWith("input.")) {
+    const message = typeof payload.message === "string"
+      ? payload.message.replace(/[\u0000-\u001f\u007f]/gu, " ").slice(0, 220)
+      : "Autorisation système requise.";
+    return `${payload.code}: ${message}`;
   }
+  if (type === "runtime.snapshot") return "Aperçu natif actualisé.";
+  if (type === "config.changed") return "Configuration actualisée.";
+  if (type === "config.invalid") return "Configuration invalide.";
+  if (type === "simulation.changed") return "Contexte visuel actualisé, sans effet système.";
+  return payload === undefined ? "" : "Événement reçu sans contenu affiché.";
 }
 
 function mergeSimulationContext(base: SimulationContext, candidate: JsonObject): SimulationContext {
@@ -63,6 +67,29 @@ function mergeSimulationContext(base: SimulationContext, candidate: JsonObject):
     const clock = candidate.time.match(/(?:T|^)(\d{2}:\d{2})/u)?.[1];
     next.time = clock ?? candidate.time;
   }
+  if (typeof candidate.inputAccess === "boolean") next.inputAccess = candidate.inputAccess;
+  return next;
+}
+
+function mergeRuntimeSnapshot(current: JsonObject | undefined, incoming: JsonObject): JsonObject {
+  const next: JsonObject = { ...(current ?? {}), ...incoming };
+  if (!Array.isArray(incoming.items)) return next;
+  const previousByID = new Map<string, JsonObject>();
+  if (Array.isArray(current?.items)) {
+    current.items.forEach((candidate) => {
+      if (isRecord(candidate) && typeof candidate.id === "string") previousByID.set(candidate.id, candidate);
+    });
+  }
+  next.items = incoming.items.map((candidate) => {
+    if (!isRecord(candidate) || typeof candidate.id !== "string") return candidate;
+    const merged: JsonObject = { ...(previousByID.get(candidate.id) ?? {}), ...candidate };
+    for (const nullableField of ["renderedImage", "title"]) {
+      if (Object.prototype.hasOwnProperty.call(candidate, nullableField) && candidate[nullableField] === null) {
+        delete merged[nullableField];
+      }
+    }
+    return merged;
+  });
   return next;
 }
 
@@ -84,7 +111,7 @@ export function useEditorState() {
   const [events, setEvents] = useState<EventRecord[]>([]);
   const [runtimeContext, setRuntimeContext] = useState<SimulationContext>(DEFAULT_SIMULATION);
   const [simulationOverride, setSimulationOverride] = useState<SimulationContext>();
-  const [simulationResult, setSimulationResult] = useState("Aucune action simulée.");
+  const [simulationResult, setSimulationResult] = useState("Aucune action décrite.");
   const [runtimeSnapshot, setRuntimeSnapshot] = useState<JsonObject>();
   const [initialized, setInitialized] = useState(false);
   const [sessionReady, setSessionReady] = useState(false);
@@ -103,7 +130,14 @@ export function useEditorState() {
   useEffect(() => { sourceRef.current = rawSource; }, [rawSource]);
 
   const appendEvent = useCallback((type: string, detail = "", time = new Date().toISOString()) => {
-    setEvents((current) => [{ id: createID("event"), type, detail, time }, ...current].slice(0, MAX_EVENTS));
+    setEvents((current) => {
+      const first = current[0];
+      const closeInTime = first && Math.abs(new Date(time).getTime() - new Date(first.time).getTime()) < 5_000;
+      if (first?.type === type && first.detail === detail && closeInTime) {
+        return [{ ...first, time, count: (first.count ?? 1) + 1 }, ...current.slice(1)];
+      }
+      return [{ id: createID("event"), type, detail, time, count: 1 }, ...current].slice(0, MAX_EVENTS);
+    });
   }, []);
 
   const acceptEnvelope = useCallback((envelope: {
@@ -218,9 +252,9 @@ export function useEditorState() {
     const controller = connectEvents(
       (event: SocketEvent) => {
         const payload = event.payload;
-        appendEvent(event.type, eventDetail(payload), event.timestamp);
+        appendEvent(event.type, eventDetail(event.type, payload), event.timestamp);
         if (event.type === "runtime.snapshot" && isRecord(payload)) {
-          setRuntimeSnapshot(payload);
+          setRuntimeSnapshot((current) => mergeRuntimeSnapshot(current, payload));
           if (isRecord(payload.context)) {
             setRuntimeContext((current) => {
               const next = mergeSimulationContext(current, payload.context as JsonObject);
@@ -419,7 +453,7 @@ export function useEditorState() {
     try {
       const response = await api.setSimulationContext(context);
       setSimulationOverride(mergeSimulationContext(context, response.context ?? context));
-      appendEvent("simulation.changed", eventDetail(response.context ?? context));
+      appendEvent("simulation.changed", "Contexte visuel personnalisé.");
     } catch (error) {
       appendEvent("simulation.error", error instanceof Error ? error.message : String(error));
     }
@@ -430,14 +464,25 @@ export function useEditorState() {
     const action = item?.actions?.find((candidate) => candidate.trigger === trigger) ?? item?.actions?.[0];
     try {
       const response = await api.simulateAction({ itemID, trigger, action });
-      setSimulationResult(response.description || "Action simulée sans exécution.");
-      appendEvent("simulation.action", response.description);
+      setSimulationResult(response.description || "Action décrite, sans exécution.");
+      appendEvent("simulation.action", "Action décrite, sans exécution.");
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       setSimulationResult(message);
       appendEvent("simulation.error", message);
     }
   }, [appendEvent, history.present.items]);
+
+  const beginSimulation = useCallback(() => {
+    setSimulationOverride((current) => current ?? runtimeContextRef.current);
+    appendEvent("simulation.local", "Contexte visuel personnalisé.");
+  }, [appendEvent]);
+
+  const resetSimulation = useCallback(() => {
+    setSimulationOverride(undefined);
+    setSimulationResult("Aucune action décrite.");
+    appendEvent("simulation.local", "Retour au mode Direct.");
+  }, [appendEvent]);
 
   const selectedItem = useMemo(
     () => history.present.items.find((item) => item.id === selectedID),
@@ -461,6 +506,7 @@ export function useEditorState() {
     selectedItem,
     events,
     simulation,
+    simulationDirect: simulationOverride === undefined,
     simulationResult,
     runtimeSnapshot,
     formLocked,
@@ -476,6 +522,8 @@ export function useEditorState() {
     undo,
     redo,
     updateSimulation,
+    beginSimulation,
+    resetSimulation,
     simulateAction,
   };
 }

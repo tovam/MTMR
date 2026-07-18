@@ -237,6 +237,52 @@ final class ConfigurationCoreTests: XCTestCase {
         XCTAssertNil(runtimeJSON.objectValue?["id"])
     }
 
+    func testEditorNameRoundTripsButNeverChangesRuntimeDataOrFingerprint() throws {
+        let source = #"""
+        {
+          "formatVersion": 1,
+          "items": [{
+            "id": "play",
+            "type": "play",
+            "editorName": "Lecture principale"
+          }]
+        }
+        """#
+        let decoded = codec.decode(source)
+        let document = try XCTUnwrap(decoded.document)
+        XCTAssertEqual(document.items.first?.editorName, "Lecture principale")
+        XCTAssertTrue(try XCTUnwrap(decoded.canonicalSource).contains("\"editorName\""))
+
+        let namedRuntime = try XCTUnwrap(document.runtimeItems().first)
+        XCTAssertEqual(namedRuntime.kind, "play")
+        let unnamedDocument = ConfigDocument(items: [ConfigItem(id: "play", type: "play")])
+        let unnamedRuntime = try XCTUnwrap(unnamedDocument.runtimeItems().first)
+        XCTAssertEqual(namedRuntime.data, unnamedRuntime.data)
+        XCTAssertEqual(namedRuntime.fingerprint, unnamedRuntime.fingerprint)
+
+        let runtimeJSON = try JSONDecoder().decode(JSONValue.self, from: namedRuntime.data)
+        XCTAssertNil(runtimeJSON.objectValue?["editorName"])
+    }
+
+    func testEditorNameMustBeAStringAndIsDeclaredByEveryItemSchema() throws {
+        let invalid = codec.decode(#"{"formatVersion":1,"items":[{"id":"play","type":"play","editorName":7}]}"#)
+        XCTAssertNil(invalid.document)
+        XCTAssertTrue(invalid.diagnostics.contains {
+            $0.code == "config.type" && $0.path == "$.items[0].editorName"
+        })
+
+        let definitions = try XCTUnwrap(MMTMRConfigurationSchema.document.objectValue?["$defs"]?.objectValue)
+        let itemDefinition = try XCTUnwrap(definitions["item"]?.objectValue)
+        guard case let .array(variants)? = itemDefinition["oneOf"] else {
+            return XCTFail("The item schema must expose oneOf variants.")
+        }
+        XCTAssertFalse(variants.isEmpty)
+        for variant in variants {
+            let properties = try XCTUnwrap(variant.objectValue?["properties"]?.objectValue)
+            XCTAssertEqual(properties["editorName"]?.objectValue?["type"], .string("string"))
+        }
+    }
+
     func testNestedRuntimeItemsKeepPersistentIDsAndResolveExecutables() throws {
         let configurationURL = URL(fileURLWithPath: "/project/config/.mtmr.json")
         let document = ConfigDocument(items: [

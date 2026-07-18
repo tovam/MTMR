@@ -153,6 +153,57 @@ describe("éditeur MMTMR", () => {
     expect(screen.getByDisplayValue("ž")).toBeInTheDocument();
   });
 
+  it("reste compatible avec un ancien schéma qui ne connaît pas editorName", async () => {
+    render(<App />);
+    await screen.findByRole("button", { name: "Bonjour" });
+    expect(screen.queryByLabelText(/Nom dans l’éditeur/)).not.toBeInTheDocument();
+  });
+
+  it("sépare le nom privé du titre affiché lorsque le schéma le permet", async () => {
+    const originalFetch = vi.mocked(fetch).getMockImplementation()!;
+    const namedSchema = structuredClone(schema) as typeof schema & Record<string, unknown>;
+    (namedSchema.properties.items.items.oneOf[0].properties as Record<string, unknown>).editorName = {
+      type: "string",
+      title: "Nom dans l’éditeur",
+    };
+    const namedConfig = { ...config, items: [{ ...config.items[0], editorName: "Lettre slovène" }] };
+    vi.mocked(fetch).mockImplementation(async (input, init) => {
+      const url = String(input);
+      if (url.endsWith("/schema")) return jsonResponse(namedSchema);
+      if (url.endsWith("/config") && init?.method !== "PUT") {
+        return jsonResponse({ source: `${JSON.stringify(namedConfig, null, 2)}\n`, document: namedConfig, revision: 4, diagnostics: [], valid: true });
+      }
+      return originalFetch(input, init);
+    });
+    render(<App />);
+    expect(await screen.findByRole("heading", { name: "Lettre slovène" })).toBeInTheDocument();
+    expect(screen.getByLabelText(/Nom dans l’éditeur/)).toHaveValue("Lettre slovène");
+    expect(screen.getByRole("button", { name: "Bonjour" })).toBeInTheDocument();
+  });
+
+  it("ouvre l’inspecteur depuis une ligne de l’ordre source", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByRole("button", { name: "Bonjour" });
+    await user.click(screen.getByRole("button", { name: "Replier l’inspecteur" }));
+    expect(screen.getByRole("button", { name: "Ouvrir l’inspecteur" })).toBeInTheDocument();
+    await user.click(screen.getByRole("row", { name: /Bonjour staticButton/ }));
+    expect(screen.getByRole("button", { name: "Replier l’inspecteur" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Bonjour" })).toBeInTheDocument();
+  });
+
+  it("place les interrupteurs principaux en tête et respecte leurs valeurs par défaut", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByRole("button", { name: "Bonjour" });
+    const enabled = screen.getByRole("switch", { name: /Élément actif/ });
+    const bordered = screen.getByRole("switch", { name: /Bordure/ });
+    expect(enabled).toBeChecked();
+    expect(bordered).toBeChecked();
+    await user.click(bordered);
+    expect(bordered).not.toBeChecked();
+  });
+
   it("ajoute un composant de palette et active undo", async () => {
     const user = userEvent.setup();
     render(<App />);
@@ -163,6 +214,16 @@ describe("éditeur MMTMR", () => {
     expect(screen.getByRole("button", { name: "Annuler" })).not.toBeDisabled();
     await user.click(screen.getByRole("button", { name: "Annuler" }));
     expect(screen.queryByRole("button", { name: "Nouveau" })).not.toBeInTheDocument();
+  });
+
+  it("explique un composant au survol de la palette", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByRole("button", { name: "Bonjour" });
+    await user.hover(screen.getByTitle("Ajouter Bouton statique"));
+    const tooltip = await screen.findByRole("tooltip");
+    expect(tooltip).toHaveTextContent("Affiche un libellé fixe");
+    expect(tooltip).toHaveTextContent("ž / Ž");
   });
 
   it("dépose un composant de palette dans la zone centrale", async () => {
@@ -378,6 +439,111 @@ describe("éditeur MMTMR", () => {
     expect(screen.getByText("Géométrie native synchronisée")).toBeInTheDocument();
   });
 
+  it("utilise l’image de configuration comme fallback avec l’ancien binaire", async () => {
+    const originalFetch = vi.mocked(fetch).getMockImplementation()!;
+    const imageConfig = { ...config, items: [{ ...config.items[0], image: { base64: "AA==" } }] };
+    vi.mocked(fetch).mockImplementation(async (input, init) => {
+      if (String(input).endsWith("/config") && init?.method !== "PUT") {
+        return jsonResponse({ source: `${JSON.stringify(imageConfig, null, 2)}\n`, document: imageConfig, revision: 4, diagnostics: [], valid: true });
+      }
+      return originalFetch(input, init);
+    });
+    render(<App />);
+    const item = await screen.findByRole("button", { name: "Bonjour" });
+    expect(item.querySelector("img.touch-item-config-image")).toHaveAttribute("src", "data:image/png;base64,AA==");
+    expect(item).toHaveTextContent("Bonjour");
+  });
+
+  it("affiche un rendu AppKit complet sans dupliquer son titre ou son icône", async () => {
+    render(<App />);
+    await screen.findByRole("button", { name: "Bonjour" });
+    await waitFor(() => expect(MockWebSocket.instances).toHaveLength(1));
+    MockWebSocket.instances[0].sendEvent({
+      type: "runtime.snapshot",
+      timestamp: new Date().toISOString(),
+      payload: {
+        items: [{
+          id: "hello",
+          width: 140,
+          height: 40,
+          align: "left",
+          visible: true,
+          kind: "dock",
+          title: "Rendu MMTMR",
+          renderedImage: "data:image/png;base64,AA==",
+        }],
+      },
+    });
+    const item = await screen.findByRole("button", { name: "Rendu MMTMR" });
+    expect(item).toHaveClass("has-native-render");
+    expect(item).toHaveStyle({ width: "140px", height: "40px" });
+    expect(item.querySelector("img.touch-item-complete-render")).toHaveAttribute("src", "data:image/png;base64,AA==");
+    expect(item.querySelector(".touch-item-label")).toBeNull();
+    expect(item.querySelector(".touch-item-symbol")).toBeNull();
+  });
+
+  it("fusionne les snapshots delta, conserve puis supprime explicitement l’image native", async () => {
+    render(<App />);
+    await screen.findByRole("button", { name: "Bonjour" });
+    await waitFor(() => expect(MockWebSocket.instances).toHaveLength(1));
+    const socket = MockWebSocket.instances[0];
+    socket.sendEvent({
+      type: "runtime.snapshot",
+      timestamp: new Date().toISOString(),
+      payload: { items: [{ id: "hello", align: "left", width: 90, visible: true, title: "Titre natif", renderedImage: "data:image/png;base64,AA==" }] },
+    });
+    expect((await screen.findByRole("button", { name: "Titre natif" })).querySelector("img")).toBeInTheDocument();
+
+    socket.sendEvent({
+      type: "runtime.snapshot",
+      timestamp: new Date().toISOString(),
+      payload: { items: [{ id: "hello", align: "right", width: 100, visible: true }] },
+    });
+    let merged: HTMLElement | undefined;
+    await waitFor(() => {
+      merged = within(screen.getByTestId("drop-right")).getByRole("button", { name: "Titre natif" });
+      expect(merged.querySelector("img")).toBeInTheDocument();
+    });
+
+    socket.sendEvent({
+      type: "runtime.snapshot",
+      timestamp: new Date().toISOString(),
+      payload: { items: [{ id: "hello", align: "right", width: 100, visible: true, renderedImage: null }] },
+    });
+    await waitFor(() => expect(screen.getByRole("button", { name: "Titre natif" }).querySelector("img")).toBeNull());
+    expect(screen.getByRole("button", { name: "Titre natif" })).toHaveTextContent("Titre natif");
+
+    socket.sendEvent({
+      type: "runtime.snapshot",
+      timestamp: new Date().toISOString(),
+      payload: { items: [{ id: "hello", align: "right", width: 100, visible: true, title: null }] },
+    });
+    expect(await screen.findByRole("button", { name: "Bonjour" })).toBeInTheDocument();
+  });
+
+  it("affiche l’avertissement Accessibilité et un diagnostic input sûr sans révéler les autres payloads", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByRole("button", { name: "Bonjour" });
+    await waitFor(() => expect(MockWebSocket.instances).toHaveLength(1));
+    const socket = MockWebSocket.instances[0];
+    socket.sendEvent({
+      type: "runtime.snapshot",
+      timestamp: new Date().toISOString(),
+      payload: { items: [], context: { inputAccess: false } },
+    });
+    expect(await screen.findByRole("alert")).toHaveTextContent("Réglages > Accessibilité");
+    await user.click(screen.getByRole("tab", { name: "Aperçu" }));
+    await user.click(screen.getByRole("button", { name: "Personnalisé" }));
+    expect(screen.getByRole("alert")).toHaveTextContent("Réglages > Accessibilité");
+    socket.sendEvent({ type: "server.error", timestamp: new Date().toISOString(), payload: { code: "input.access", message: "Autorisation refusée" } });
+    socket.sendEvent({ type: "server.error", timestamp: new Date().toISOString(), payload: { code: "server.internal", message: "SECRET_PAYLOAD" } });
+    await user.click(screen.getByRole("tab", { name: /Journal/ }));
+    expect(await screen.findByText(/input\.access: Autorisation refusée/)).toBeInTheDocument();
+    expect(screen.queryByText(/SECRET_PAYLOAD/)).not.toBeInTheDocument();
+    expect(screen.getAllByText("Reçu de MMTMR").length).toBeGreaterThan(0);
+  });
+
   it("applique le contexte runtime sans le polluer avec une simulation d’action", async () => {
     render(<App />);
     await screen.findByRole("button", { name: "Bonjour" });
@@ -407,14 +573,30 @@ describe("éditeur MMTMR", () => {
     const user = userEvent.setup();
     render(<App />);
     await screen.findByRole("button", { name: "Bonjour" });
-    await user.click(screen.getByRole("tab", { name: "Simulation" }));
-    await user.click(screen.getByRole("button", { name: "Simuler, sans exécuter" }));
+    await user.click(screen.getByRole("tab", { name: "Aperçu" }));
+    await user.click(screen.getByRole("button", { name: "Décrire l’action" }));
     expect(await screen.findByText("La lettre ž serait saisie.")).toBeInTheDocument();
     const call = vi.mocked(fetch).mock.calls.find(([url]) => String(url).endsWith("/preview/action"));
     expect(call).toBeDefined();
     const body = JSON.parse(String(call?.[1]?.body));
     expect(body).toMatchObject({ itemID: "hello", trigger: "singleTap" });
     expect(body).not.toHaveProperty("execute");
+  });
+
+  it("démarre en mode Direct et réinitialise le contexte local sans appel serveur", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByRole("button", { name: "Bonjour" });
+    await user.click(screen.getByRole("tab", { name: "Aperçu" }));
+    const direct = screen.getByRole("button", { name: "Direct" });
+    const application = screen.getByLabelText("Application active");
+    expect(direct).toHaveAttribute("aria-pressed", "true");
+    expect(application).toBeDisabled();
+    await user.click(screen.getByRole("button", { name: "Personnalisé" }));
+    expect(application).not.toBeDisabled();
+    await user.click(direct);
+    expect(application).toBeDisabled();
+    expect(vi.mocked(fetch).mock.calls.some(([url]) => String(url).endsWith("/preview/context"))).toBe(false);
   });
 
   it("replie indépendamment les deux panneaux latéraux", async () => {

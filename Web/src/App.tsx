@@ -79,12 +79,18 @@ export function App() {
     if (!editor.selectedItem || editor.formLocked) return;
     const copy = cloneDocument({ formatVersion: 1, items: [editor.selectedItem] }).items[0];
     copy.id = createID(copy.type);
+    if (typeof copy.editorName === "string" && copy.editorName) copy.editorName = `${copy.editorName} copie`;
     if (typeof copy.title === "string" && copy.title) copy.title = `${copy.title} copie`;
     const index = editor.document.items.findIndex((candidate) => candidate.id === editor.selectedItem?.id);
     const document = cloneDocument(editor.document);
     document.items.splice(index + 1, 0, copy);
     editor.commitDocument(document, "item.duplicated");
     editor.select(copy.id);
+  };
+
+  const selectFromList = (id: string) => {
+    editor.select(id);
+    setInspectorCollapsed(false);
   };
 
   const deleteSelected = () => {
@@ -124,6 +130,18 @@ export function App() {
         </div>
       </div>
 
+      <TouchBarPreview
+        document={editor.document}
+        schema={editor.schema}
+        selectedID={editor.selectedID}
+        simulation={editor.simulation}
+        runtimeSnapshot={editor.runtimeSnapshot}
+        editingLocked={editor.formLocked}
+        onSelect={editor.select}
+        onMove={move}
+        onAdd={add}
+      />
+
       <div class="workspace">
         <Palette
           schema={editor.schema}
@@ -134,17 +152,6 @@ export function App() {
         />
 
         <div class="workspace-center">
-          <TouchBarPreview
-            document={editor.document}
-            schema={editor.schema}
-            selectedID={editor.selectedID}
-            simulation={editor.simulation}
-            runtimeSnapshot={editor.runtimeSnapshot}
-            editingLocked={editor.formLocked}
-            onSelect={editor.select}
-            onMove={move}
-            onAdd={add}
-          />
           <WorkspacePanels
             tab={tab}
             document={editor.document}
@@ -152,6 +159,7 @@ export function App() {
             diagnostics={editor.diagnostics}
             events={editor.events}
             simulation={editor.simulation}
+            simulationDirect={editor.simulationDirect}
             simulationResult={editor.simulationResult}
             selectedItem={editor.selectedItem}
             saveState={editor.saveState}
@@ -159,7 +167,10 @@ export function App() {
             onTab={setTab}
             onSource={editor.setRawSource}
             onDocument={(document) => editor.commitDocument(document, "document.changed")}
+            onSelectItem={selectFromList}
             onSimulation={editor.updateSimulation}
+            onBeginSimulation={editor.beginSimulation}
+            onResetSimulation={editor.resetSimulation}
             onSimulateAction={editor.simulateAction}
           />
         </div>

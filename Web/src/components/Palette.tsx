@@ -1,4 +1,6 @@
+import { useRef, useState } from "preact/hooks";
 import { schemaItemTypes } from "../model";
+import type { PaletteItemPresentation } from "../model";
 import type { JsonSchema } from "../types";
 
 export const DRAG_TYPE = "application/x-mmtmr-item";
@@ -36,8 +38,21 @@ interface PaletteProps {
 
 export function Palette({ schema, collapsed, editingLocked = false, onToggle, onAdd }: PaletteProps) {
   const types = schemaItemTypes(schema);
+  const asideRef = useRef<HTMLElement>(null);
+  const [detail, setDetail] = useState<{ entry: PaletteItemPresentation; top: number }>();
+  const showDetail = (entry: PaletteItemPresentation, target: HTMLElement) => {
+    const aside = asideRef.current?.getBoundingClientRect();
+    const rect = target.getBoundingClientRect();
+    const naturalTop = rect.top - (aside?.top ?? 0) - 8;
+    setDetail({ entry, top: Math.max(48, Math.min(naturalTop, (aside?.height ?? 500) - 188)) });
+  };
   return (
-    <aside class={`palette side-panel ${collapsed ? "is-collapsed" : ""}`} aria-label="Palette de composants">
+    <aside
+      ref={asideRef}
+      class={`palette side-panel ${collapsed ? "is-collapsed" : ""}`}
+      aria-label="Palette de composants"
+      onMouseLeave={() => setDetail(undefined)}
+    >
       <div class="panel-heading">
         {!collapsed && <><span>Composants</span><span class="count-pill">{types.length}</span></>}
         <button class="icon-button collapse-button" onClick={onToggle} aria-label={collapsed ? "Ouvrir la palette" : "Replier la palette"}>
@@ -56,7 +71,11 @@ export function Palette({ schema, collapsed, editingLocked = false, onToggle, on
                 disabled={editingLocked}
                 onDragStart={(event) => setDragPayload(event, { kind: "palette", type: entry.type })}
                 onDblClick={() => onAdd(entry.type)}
+                onMouseEnter={(event) => showDetail(entry, event.currentTarget)}
+                onFocus={(event) => showDetail(entry, event.currentTarget)}
+                onBlur={() => setDetail(undefined)}
                 title={`Ajouter ${entry.label}`}
+                aria-describedby={`palette-help-${entry.type}`}
               >
                 <span class="palette-icon" aria-hidden="true">{entry.icon}</span>
                 <span>
@@ -66,6 +85,23 @@ export function Palette({ schema, collapsed, editingLocked = false, onToggle, on
                 <span class="drag-handle" aria-hidden="true">⠿</span>
               </button>
             ))}
+          </div>
+        </div>
+      )}
+      {!collapsed && detail && (
+        <div
+          class="palette-popover"
+          id={`palette-help-${detail.entry.type}`}
+          role="tooltip"
+          style={{ top: `${detail.top}px` }}
+        >
+          <div class="palette-popover-heading">
+            <span class="palette-popover-icon" aria-hidden="true">{detail.entry.icon}</span>
+            <div><strong>{detail.entry.label}</strong><code>{detail.entry.type}</code></div>
+          </div>
+          <p>{detail.entry.description}</p>
+          <div class="palette-examples" aria-label="Exemples">
+            {detail.entry.examples.slice(0, 3).map((example) => <span key={example}>{example}</span>)}
           </div>
         </div>
       )}

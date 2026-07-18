@@ -10,20 +10,53 @@ import type {
 
 export const ALIGNMENTS: Alignment[] = ["left", "center", "right"];
 
-export const FALLBACK_ITEM_TYPES = [
-  { type: "staticButton", label: "Bouton statique", icon: "Aa" },
-  { type: "timeButton", label: "Heure", icon: "◷" },
-  { type: "battery", label: "Batterie", icon: "▰" },
-  { type: "brightness", label: "Luminosité", icon: "☀" },
-  { type: "volume", label: "Volume", icon: "◖" },
-  { type: "music", label: "Musique", icon: "♫" },
-  { type: "inputsource", label: "Source de saisie", icon: "⌨" },
-  { type: "weather", label: "Météo", icon: "☁" },
-  { type: "currency", label: "Devise", icon: "¤" },
-  { type: "group", label: "Groupe", icon: "▣" },
-  { type: "swipe", label: "Zone tactile", icon: "↔" },
-  { type: "shellScriptTitledButton", label: "Script shell", icon: ">_" },
-  { type: "appleScriptTitledButton", label: "AppleScript", icon: "⌘" },
+export interface PaletteItemPresentation {
+  type: string;
+  label: string;
+  icon: string;
+  description: string;
+  examples: readonly string[];
+}
+
+export const FALLBACK_ITEM_TYPES: readonly PaletteItemPresentation[] = [
+  { type: "staticButton", label: "Bouton statique", icon: "Aa", description: "Affiche un libellé fixe et déclenche une ou plusieurs actions. Idéal pour saisir un caractère ou lancer une commande.", examples: ["ž / Ž", "Ouvrir une URL", "Raccourci"] },
+  { type: "appleScriptTitledButton", label: "Titre AppleScript", icon: "⌘", description: "Calcule périodiquement le titre avec AppleScript. Le script reste exécuté par MMTMR, jamais par l’aperçu web.", examples: ["État d’une app", "Texte dynamique"] },
+  { type: "shellScriptTitledButton", label: "Titre Shell", icon: ">_", description: "Calcule périodiquement le titre avec un script shell. Pratique pour une information locale courte.", examples: ["Branche Git", "Statut service"] },
+  { type: "timeButton", label: "Heure", icon: "◷", description: "Affiche l’heure selon un format, un fuseau et une locale. L’aperçu direct reprend la valeur fournie par MMTMR.", examples: ["14:32", "sam. 18", "UTC"] },
+  { type: "battery", label: "Batterie", icon: "▰", description: "Affiche le niveau et l’état de la batterie du Mac. La valeur réelle arrive par le mode Direct.", examples: ["82 %", "En charge"] },
+  { type: "cpu", label: "Processeur", icon: "%", description: "Affiche l’utilisation du processeur avec un rafraîchissement réglable. Convient à une surveillance rapide.", examples: ["CPU 18 %", "CPU 73 %"] },
+  { type: "dock", label: "Applications", icon: "▦", description: "Présente les applications actives sous forme de Dock tactile. Les icônes exactes nécessitent le rendu Direct de MMTMR.", examples: ["Finder", "Safari", "Terminal"] },
+  { type: "volume", label: "Volume", icon: "◖", description: "Ajoute le contrôle interactif du volume système. Ce composant gère lui-même ses gestes.", examples: ["Curseur audio", "Muet"] },
+  { type: "brightness", label: "Luminosité", icon: "☀", description: "Ajoute le contrôle interactif de luminosité. Une image personnalisée peut remplacer le symbole.", examples: ["Curseur écran", "☀"] },
+  { type: "weather", label: "Météo", icon: "☁", description: "Affiche la météo depuis le fournisseur configuré. Une clé API et les unités peuvent être précisées.", examples: ["☀ 24°", "☂ 12°"] },
+  { type: "yandexWeather", label: "Météo Yandex", icon: "☂", description: "Affiche la météo issue de Yandex. Le contenu se met à jour selon l’intervalle choisi.", examples: ["Nuageux 17°", "Pluie"] },
+  { type: "currency", label: "Devise", icon: "€", description: "Convertit et affiche une paire de devises. Le mode complet ajoute davantage de détail.", examples: ["EUR → USD", "GBP → EUR"] },
+  { type: "inputsource", label: "Source de saisie", icon: "⌨", description: "Affiche la source de saisie active. Utile pour repérer immédiatement la langue du clavier.", examples: ["ABC", "FR", "RU"] },
+  { type: "music", label: "Musique", icon: "♫", description: "Affiche le média en cours de lecture. Le texte peut défiler lorsque le titre est long.", examples: ["♫ Lecture", "Artiste — titre"] },
+  { type: "group", label: "Groupe", icon: "⧉", description: "Regroupe plusieurs composants dans un sous-ensemble. Les éléments imbriqués conservent leur ordre.", examples: ["Transport", "Système"] },
+  { type: "nightShift", label: "Night Shift", icon: "◐", description: "Active ou désactive Night Shift. L’état exact est fourni par macOS.", examples: ["Activé", "Désactivé"] },
+  { type: "dnd", label: "Ne pas déranger", icon: "☾", description: "Bascule le mode Ne pas déranger. Le bouton reflète l’état système lorsque disponible.", examples: ["Concentration", "Silence"] },
+  { type: "pomodoro", label: "Pomodoro", icon: "◴", description: "Lance une alternance travail et repos. Les deux durées sont configurables.", examples: ["25 min", "5 min"] },
+  { type: "network", label: "Réseau", icon: "⇅", description: "Affiche le débit réseau montant et descendant. Les unités peuvent être dynamiques, en octets ou en bits.", examples: ["↓ 4,2 Mo/s", "↑ 320 Ko/s"] },
+  { type: "darkMode", label: "Mode sombre", icon: "◑", description: "Bascule l’apparence claire ou sombre de macOS. L’aperçu Direct suit le thème courant.", examples: ["Clair", "Sombre"] },
+  { type: "swipe", label: "Zone tactile", icon: "↔", description: "Déclenche un script après un balayage de plusieurs doigts. La zone elle-même reste visuellement discrète.", examples: ["2 doigts →", "3 doigts ←"] },
+  { type: "upnext", label: "Événements à venir", icon: "◳", description: "Affiche les prochains événements du calendrier. La fenêtre temporelle et le nombre de résultats sont réglables.", examples: ["Réunion 15:00", "Demain 09:30"] },
+  { type: "escape", label: "Échap", icon: "esc", description: "Envoie la touche Échap. C’est le remplacement classique de la touche physique.", examples: ["Esc"] },
+  { type: "delete", label: "Supprimer", icon: "⌫", description: "Envoie la touche de suppression arrière. Peut être placé où il reste facilement accessible.", examples: ["⌫"] },
+  { type: "brightnessUp", label: "Luminosité +", icon: "☀↑", description: "Augmente la luminosité de l’écran d’un cran. L’action est native et immédiate.", examples: ["Écran +"] },
+  { type: "brightnessDown", label: "Luminosité −", icon: "☀↓", description: "Diminue la luminosité de l’écran d’un cran. L’action est native et immédiate.", examples: ["Écran −"] },
+  { type: "illuminationUp", label: "Rétroéclairage +", icon: "✦↑", description: "Augmente le rétroéclairage du clavier. Disponible selon le matériel.", examples: ["Clavier +"] },
+  { type: "illuminationDown", label: "Rétroéclairage −", icon: "✦↓", description: "Diminue le rétroéclairage du clavier. Disponible selon le matériel.", examples: ["Clavier −"] },
+  { type: "volumeDown", label: "Volume −", icon: "🔉", description: "Baisse le volume système d’un cran. Le symbole est distinct du contrôle continu de volume.", examples: ["Son −"] },
+  { type: "volumeUp", label: "Volume +", icon: "🔊", description: "Augmente le volume système d’un cran. Le symbole est distinct du contrôle continu de volume.", examples: ["Son +"] },
+  { type: "mute", label: "Muet", icon: "🔇", description: "Active ou désactive la sortie audio. L’action utilise la touche média native.", examples: ["Couper le son"] },
+  { type: "previous", label: "Précédent", icon: "◀|", description: "Revient à la piste ou au chapitre précédent. Fonctionne avec les applications multimédia compatibles.", examples: ["Piste précédente"] },
+  { type: "play", label: "Lecture / pause", icon: "▶", description: "Bascule entre lecture et pause. Fonctionne avec les applications multimédia compatibles.", examples: ["Lecture", "Pause"] },
+  { type: "next", label: "Suivant", icon: "|▶", description: "Passe à la piste ou au chapitre suivant. Fonctionne avec les applications multimédia compatibles.", examples: ["Piste suivante"] },
+  { type: "sleep", label: "Veille", icon: "zZ", description: "Place le Mac en veille. À réserver à une zone qui évite les appuis accidentels.", examples: ["Veille Mac"] },
+  { type: "displaySleep", label: "Éteindre l’écran", icon: "▰z", description: "Met uniquement les écrans en veille. Le Mac continue de fonctionner.", examples: ["Écran en veille"] },
+  { type: "exitTouchbar", label: "Quitter la Touch Bar", icon: "⏏", description: "Ferme la barre modale MMTMR. Utile comme contrôle de sortie permanent.", examples: ["Quitter"] },
+  { type: "close", label: "Fermer", icon: "×", description: "Ferme la barre ou la vue courante selon le contexte. Le comportement est fourni par MMTMR.", examples: ["Fermer"] },
 ] as const;
 
 export const FALLBACK_ACTION_TYPES = [
@@ -136,6 +169,9 @@ export function createItem(type: string, schema?: JsonSchema): ItemConfig {
     }
   }
   if (type === "staticButton" && item.title === undefined) item.title = "Nouveau";
+  if (item.editorName === undefined && typeSchema?.properties?.editorName !== undefined) {
+    item.editorName = FALLBACK_ITEM_TYPES.find((entry) => entry.type === type)?.label ?? type;
+  }
   return item;
 }
 
@@ -143,6 +179,21 @@ export function itemLabel(item: ItemConfig): string {
   if (typeof item.title === "string" && item.title.trim()) return item.title;
   const match = FALLBACK_ITEM_TYPES.find((entry) => entry.type === item.type);
   return match?.label ?? item.type;
+}
+
+export function itemEditorName(item: ItemConfig): string {
+  if (typeof item.editorName === "string" && item.editorName.trim()) return item.editorName;
+  return itemLabel(item);
+}
+
+export function itemPresentation(type: string): PaletteItemPresentation {
+  return FALLBACK_ITEM_TYPES.find((entry) => entry.type === type) ?? {
+    type,
+    label: type,
+    icon: "•",
+    description: "Composant déclaré par le schéma MMTMR. Ses réglages sont disponibles dans l’inspecteur.",
+    examples: [type],
+  };
 }
 
 export function moveItem(
@@ -291,8 +342,8 @@ export function mergeAllOf(root: JsonSchema | undefined, schema: JsonSchema): Js
   );
 }
 
-export function schemaItemTypes(root?: JsonSchema): Array<{ type: string; label: string; icon: string }> {
-  const discovered = new Map<string, { type: string; label: string; icon: string }>();
+export function schemaItemTypes(root?: JsonSchema): PaletteItemPresentation[] {
+  const discovered = new Map<string, PaletteItemPresentation>();
   const itemRoot = itemRootSchema(root);
   for (const rawVariant of [...(itemRoot?.oneOf ?? []), ...(itemRoot?.anyOf ?? [])]) {
     const variant = mergeAllOf(root, resolveReference(root, rawVariant) ?? rawVariant);
@@ -300,11 +351,14 @@ export function schemaItemTypes(root?: JsonSchema): Array<{ type: string; label:
     const values = property?.const !== undefined ? [property.const] : property?.enum ?? [];
     for (const value of values) {
       if (typeof value !== "string") continue;
-      const fallback = FALLBACK_ITEM_TYPES.find((entry) => entry.type === value);
+      const known = FALLBACK_ITEM_TYPES.find((entry) => entry.type === value);
+      const fallback = known ?? itemPresentation(value);
       discovered.set(value, {
         type: value,
-        label: variant.title ?? fallback?.label ?? value,
-        icon: fallback?.icon ?? "◇",
+        label: known?.label ?? variant.title ?? value,
+        icon: fallback.icon,
+        description: fallback.description || variant.description || `Composant ${variant.title ?? value}.`,
+        examples: fallback.examples,
       });
     }
   }

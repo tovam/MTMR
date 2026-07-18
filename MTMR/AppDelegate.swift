@@ -23,10 +23,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var editorPort = MMTMREditorServerConfiguration.defaultPort
     private var terminating = false
     private var lastRuntimeError: String?
+    private var lastInputDispatchError: String?
     private var preparedRuntimeItems: [String: [RuntimeBarItem]] = [:]
     private let networkMonitor = NWPathMonitor()
     private var networkConnected = false
     private var runtimeSnapshotTimer: Timer?
+    private var lastRuntimeSnapshotHash: String?
+    private let runtimeContextTimeFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "yyyy-MM-dd'T'HH:mmXXXXX"
+        return formatter
+    }()
 
     func applicationDidFinishLaunching(_: Notification) {
         guard noOtherMTMRInstanceIsRunning() else {
@@ -39,14 +47,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
 
-        AXIsProcessTrustedWithOptions([
-            "AXTrustedCheckOptionPrompt" as NSString: true,
-        ] as NSDictionary)
-
         configureLaunchOptions()
         bootstrapConfiguration()
         configureStatusItem()
         configureRuntimeContextMonitoring()
+        configureInputDispatchMonitoring()
 
         TouchBarController.shared.setupControlStripPresence()
         if let snapshot = coordinator?.loadFromDisk() {
@@ -56,6 +61,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         startConfigurationWatcher()
         startEditorServer(port: editorPort)
         createMenu()
+
+        // Move the one-time macOS permission prompt out of the first physical
+        // Touch Bar tap so an already-authorized app injects immediately.
+        DispatchQueue.main.async { [weak self] in
+            self?.requestSystemInputAccess(openSettingsIfDenied: false)
+        }
 
         let notifications = NSWorkspace.shared.notificationCenter
         notifications.addObserver(self, selector: #selector(updateIsBlockedApp(_:)), name: NSWorkspace.didLaunchApplicationNotification, object: nil)
@@ -70,6 +81,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         networkMonitor.cancel()
         runtimeSnapshotTimer?.invalidate()
         runtimeSnapshotTimer = nil
+        NotificationCenter.default.removeObserver(self, name: .mmtmrInputDispatchDidComplete, object: nil)
 
         guard let editorServer else { return .terminateNow }
         Task {
@@ -111,6 +123,51 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
         NSWorkspace.shared.open(configurationURL)
+    }
+
+    private func configureInputDispatchMonitoring() {
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(inputDispatchDidComplete(_:)),
+            name: .mmtmrInputDispatchDidComplete,
+            object: nil
+        )
+    }
+
+    @objc private func requestSystemInputAccess(_: Any?) {
+        requestSystemInputAccess(openSettingsIfDenied: true)
+    }
+
+    private func requestSystemInputAccess(openSettingsIfDenied: Bool) {
+        let granted = InputAccessCoordinator.shared.requestCoreGraphicsPostEventAccessIfNeeded()
+        createMenu()
+        publishRuntimeSnapshot(force: true)
+
+        guard !granted, openSettingsIfDenied,
+              let settingsURL = URL(
+                  string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"
+              )
+        else { return }
+        NSWorkspace.shared.open(settingsURL)
+    }
+
+    @objc private func inputDispatchDidComplete(_ notification: Notification) {
+        guard let result = notification.userInfo?[MMTMRInputDispatchNotification.resultUserInfoKey]
+            as? InputDispatchResult
+        else { return }
+
+        if result.succeeded {
+            lastInputDispatchError = nil
+        } else {
+            let message = Self.localizedInputDispatchMessage(result)
+            lastInputDispatchError = message
+            publishServerError(
+                message,
+                code: "input.\(result.action.rawValue).\(result.status.rawValue)"
+            )
+        }
+        createMenu()
+        publishRuntimeSnapshot()
     }
 
     @objc private func changeEditorPort(_: Any?) {
@@ -303,7 +360,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
             TouchBarController.shared.apply(runtimeItems: runtimeItems)
             lastRuntimeError = nil
-            DispatchQueue.main.async { [weak self] in self?.publishRuntimeSnapshot(revision: snapshot.revision) }
+            DispatchQueue.main.async { [weak self] in
+                self?.publishRuntimeSnapshot(revision: snapshot.revision, force: true)
+            }
             return true
         } catch {
             let diagnostic = ConfigurationDiagnostic(
@@ -345,6 +404,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         try items.map { item in
             RuntimeBarItem(
                 id: item.id,
+                kind: item.kind,
                 sourcePath: item.sourcePath,
                 fingerprint: item.fingerprint,
                 definition: try JSONDecoder().decode(BarItemDefinition.self, from: item.data)
@@ -496,7 +556,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         createMenu()
         if case .running = state, let snapshot = coordinator?.snapshot() {
             publishConfiguration(snapshot)
-            publishRuntimeSnapshot(revision: snapshot.revision)
+            publishRuntimeSnapshot(revision: snapshot.revision, force: true)
         }
     }
 
@@ -512,44 +572,97 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         Task { await editorServer.publish(event) }
     }
 
-    private func publishRuntimeSnapshot(revision: UInt64? = nil) {
+    private func publishRuntimeSnapshot(revision: UInt64? = nil, force: Bool = false) {
         guard let editorServer else { return }
-        let geometry: [ServerJSONValue] = TouchBarController.shared.runtimeGeometry().map { item in
-            .object([
+        let runtimeGeometry = TouchBarController.shared.runtimeGeometry()
+        let completeGeometry: [ServerJSONValue] = runtimeGeometry.map { item in
+            var object: [String: ServerJSONValue] = [
                 "id": .string(item.id),
                 "align": .string(item.align),
                 "width": .number(item.width),
+                "height": .number(item.height),
                 "visible": .bool(item.visible),
-            ])
+                "kind": .string(item.kind),
+            ]
+            if let title = item.title {
+                object["title"] = .string(title)
+            }
+            if let renderedImage = item.renderedImage {
+                object["renderedImage"] = .string(renderedImage)
+            }
+            return .object(object)
+        }
+        let deltaGeometry: [ServerJSONValue] = runtimeGeometry.map { item in
+            var object: [String: ServerJSONValue] = [
+                "id": .string(item.id),
+                "align": .string(item.align),
+                "width": .number(item.width),
+                "height": .number(item.height),
+                "visible": .bool(item.visible),
+                "kind": .string(item.kind),
+            ]
+            object["title"] = item.title.map { .string($0) } ?? .null
+            if item.renderedImageChanged {
+                object["renderedImage"] = item.renderedImage.map { .string($0) } ?? .null
+            }
+            return .object(object)
         }
 
         let batteryInfo = BatteryInfo()
         batteryInfo.getPSInfo()
         let theme = NSApp.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua ? "dark" : "light"
-        let payload: ServerJSONValue = .object([
-            "items": .array(geometry),
-            "context": .object([
-                "application": .string(TouchBarController.shared.frontmostApplicationIdentifier ?? ""),
-                "battery": .number(Double(batteryInfo.current)),
-                "networkConnected": .bool(networkConnected),
-                "theme": .string(theme),
-                "time": .string(ISO8601DateFormatter().string(from: Date())),
-            ]),
+        let context: ServerJSONValue = .object([
+            "application": .string(TouchBarController.shared.frontmostApplicationIdentifier ?? ""),
+            "battery": .number(Double(batteryInfo.current)),
+            "inputAccess": .bool(CGPreflightPostEventAccess()),
+            "networkConnected": .bool(networkConnected),
+            "theme": .string(theme),
+            "time": .string(runtimeContextTimeFormatter.string(from: Date())),
         ])
+        let completePayload: ServerJSONValue = .object([
+            "items": .array(completeGeometry),
+            "context": context,
+        ])
+        let eventRevision = revision ?? coordinator?.snapshot().revision
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys]
+        guard var hashData = try? encoder.encode(completePayload) else { return }
+        hashData.append(Data("|revision:\(eventRevision.map { String($0) } ?? "nil")".utf8))
+        let snapshotHash = ConfigContentHasher.sha256(hashData)
+        guard force || snapshotHash != lastRuntimeSnapshotHash else { return }
+        lastRuntimeSnapshotHash = snapshotHash
+
+        let timestamp = ISO8601DateFormatter().string(from: Date())
+        let completeEvent = ServerEvent(
+            type: .runtimeSnapshot,
+            revision: eventRevision.map { Int(clamping: $0) },
+            payload: completePayload,
+            timestamp: timestamp
+        )
         let event = ServerEvent(
             type: .runtimeSnapshot,
-            revision: revision.map { Int(clamping: $0) },
-            payload: payload
+            revision: eventRevision.map { Int(clamping: $0) },
+            payload: force ? completePayload : .object([
+                "items": .array(deltaGeometry),
+                "context": context,
+            ]),
+            timestamp: timestamp
         )
-        Task { await editorServer.publish(event) }
+        Task {
+            await editorServer.publish(event, cachedRuntimeSnapshot: completeEvent)
+        }
     }
 
-    private func publishServerError(_ message: String) {
+    private func publishServerError(_ message: String, code: String? = nil) {
         guard let editorServer else { return }
+        var payload: [String: ServerJSONValue] = ["message": .string(message)]
+        if let code {
+            payload["code"] = .string(code)
+        }
         Task {
             await editorServer.publish(ServerEvent(
                 type: .serverError,
-                payload: .object(["message": .string(message)])
+                payload: .object(payload)
             ))
         }
     }
@@ -572,6 +685,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(pathItem)
         menu.addItem(withTitle: "Changer le port…", action: #selector(changeEditorPort(_:)), keyEquivalent: "")
 
+        let inputAccessGranted = CGPreflightPostEventAccess()
+        let inputAccessItem = NSMenuItem(
+            title: inputAccessGranted
+                ? "Commandes système : autorisées"
+                : "⚠︎ Autoriser lettres, volume et luminosité…",
+            action: inputAccessGranted ? nil : #selector(requestSystemInputAccess(_:)),
+            keyEquivalent: ""
+        )
+        inputAccessItem.isEnabled = !inputAccessGranted
+        menu.addItem(inputAccessItem)
+
         if let snapshot = coordinator?.snapshot(), !snapshot.isValid {
             let diagnostic = snapshot.diagnostics.first?.message ?? "Configuration invalide"
             let item = NSMenuItem(title: "⚠︎ \(diagnostic)", action: nil, keyEquivalent: "")
@@ -579,6 +703,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             menu.addItem(item)
         } else if let lastRuntimeError {
             let item = NSMenuItem(title: "⚠︎ \(lastRuntimeError)", action: nil, keyEquivalent: "")
+            item.isEnabled = false
+            menu.addItem(item)
+        }
+        if let lastInputDispatchError {
+            let item = NSMenuItem(title: "⚠︎ \(lastInputDispatchError)", action: nil, keyEquivalent: "")
             item.isEnabled = false
             menu.addItem(item)
         }
@@ -628,6 +757,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let identifiers = ["Toxblh.MTMR", "com.toxblh.MTMR", "com.tovam.MTMR", "com.tovam.MMTMR"]
         return !identifiers.flatMap { NSRunningApplication.runningApplications(withBundleIdentifier: $0) }
             .contains(where: { $0.processIdentifier != currentPID && !$0.isTerminated })
+    }
+
+    private static func localizedInputDispatchMessage(_ result: InputDispatchResult) -> String {
+        switch result.status {
+        case .permissionDenied:
+            return "MMTMR n’est pas autorisé dans Réglages > Confidentialité et sécurité > Accessibilité."
+        case .eventCreationFailed:
+            return "macOS n’a pas pu créer l’événement pour \(result.action.rawValue)."
+        case .backendFailure:
+            return "La commande système \(result.action.rawValue) a échoué."
+        case .partialDispatch:
+            return "La commande système \(result.action.rawValue) n’a été envoyée que partiellement."
+        case .success:
+            return ""
+        }
     }
 
     private static func serverJSON<Value: Encodable>(_ value: Value) -> ServerJSONValue? {

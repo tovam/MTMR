@@ -70,6 +70,42 @@ final class MMTMREditorServerTests: XCTestCase {
         XCTAssertNil(end)
     }
 
+    func testEventHubBroadcastsRuntimeDeltaButReplaysCompleteSnapshot() async {
+        let hub = EditorServerEventHub()
+        let delta = ServerEvent(
+            type: .runtimeSnapshot,
+            payload: .object(["items": .array([.object([
+                "id": .string("clock"),
+                "title": .null,
+            ])])]),
+            timestamp: "2026-01-01T00:00:00Z"
+        )
+        let complete = ServerEvent(
+            type: .runtimeSnapshot,
+            payload: .object(["items": .array([.object([
+                "id": .string("clock"),
+                "renderedImage": .string("data:image/png;base64,AAAA"),
+            ])])]),
+            timestamp: "2026-01-01T00:00:00Z"
+        )
+
+        let liveStream = await hub.stream()
+        var liveIterator = liveStream.makeAsyncIterator()
+        await hub.publish(delta, cachedRuntimeSnapshot: complete)
+        let liveEvent = await liveIterator.next()
+        XCTAssertEqual(liveEvent, delta)
+        XCTAssertEqual(
+            liveEvent?.payload.objectValue?["items"],
+            .array([.object(["id": .string("clock"), "title": .null])])
+        )
+
+        let reconnectStream = await hub.stream()
+        var reconnectIterator = reconnectStream.makeAsyncIterator()
+        let replayedEvent = await reconnectIterator.next()
+        XCTAssertEqual(replayedEvent, complete)
+        await hub.finish()
+    }
+
     func testRootCreatesStrictSessionAndStatusRequiresIt() async throws {
         let provider = EditorServerTestProvider()
         let server = makeServer(provider: provider)

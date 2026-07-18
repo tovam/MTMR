@@ -15,6 +15,7 @@ export interface ActionConfig extends JsonObject {
 export interface ItemConfig extends JsonObject {
   id: string;
   type: string;
+  editorName?: string;
   align?: Alignment;
   title?: string;
   notes?: string;
@@ -103,6 +104,7 @@ export interface SimulationContext extends JsonObject {
   networkConnected: boolean;
   theme: "dark" | "light";
   time: string;
+  inputAccess?: boolean;
 }
 
 export interface EventRecord {
@@ -110,14 +112,19 @@ export interface EventRecord {
   time: string;
   type: string;
   detail: string;
+  count?: number;
 }
 
 export interface RuntimeItemGeometry extends JsonObject {
   id: string;
   x?: number;
   width?: number;
+  height?: number;
   align?: Alignment;
   visible?: boolean;
+  title?: string;
+  renderedImage?: string;
+  kind?: string;
 }
 
 export interface HistoryState {

@@ -17,9 +17,12 @@ actor EditorServerEventHub {
         return stream
     }
 
-    func publish(_ event: ServerEvent) {
+    /// Broadcasts `event` to current clients. Runtime updates may be image deltas;
+    /// `cachedRuntimeSnapshot` keeps the complete authoritative payload replayed
+    /// to a client that connects afterwards.
+    func publish(_ event: ServerEvent, cachedRuntimeSnapshot: ServerEvent? = nil) {
         if event.type == .runtimeSnapshot {
-            latestRuntimeSnapshot = event
+            latestRuntimeSnapshot = cachedRuntimeSnapshot ?? event
         } else if event.type == .simulationChanged,
                   event.payload.objectValue?["kind"] == .string("context") {
             // Action simulations are log entries, not visual state. Replaying

@@ -51,6 +51,7 @@ Exemple avec injection Unicode native immédiate :
       ],
       "align": "left",
       "bordered": false,
+      "editorName": "Lettre z caron",
       "id": "letter-z",
       "title": "ž",
       "type": "staticButton",
@@ -62,7 +63,11 @@ Exemple avec injection Unicode native immédiate :
 
 `typeText` envoie directement les unités UTF-16 avec `CGEvent`. Il n’utilise ni AppleScript, ni le presse-papiers, ni un collage Commande-V.
 
+Au démarrage, MMTMR demande une seule fois l’autorisation macOS nécessaire aux frappes et aux touches système. Elle doit être accordée dans **Réglages Système > Confidentialité et sécurité > Accessibilité** pour que `typeText`, le volume et la luminosité fonctionnent depuis la Touch Bar physique. L’application effectue cette demande avant le premier appui afin d’éviter le délai initial. Le menu MMTMR affiche l’état de l’autorisation et permet de rouvrir le bon panneau de réglages.
+
 Chaque item possède un `id` stable et unique. Cet identifiant est utilisé par le runtime pour ne reconstruire que les éléments réellement modifiés.
+
+`editorName` est un nom facultatif visible uniquement dans l’éditeur. Il sert à retrouver un élément sans modifier son `title`, donc sans changer ce qui apparaît sur la Touch Bar.
 
 Les chemins relatifs sont résolus depuis le dossier contenant le fichier de configuration. Les chemins commençant par `~/` restent acceptés.
 
@@ -87,7 +92,7 @@ Le menu de la barre de statut contient :
 - l’état et l’adresse du serveur ;
 - le changement du port local.
 
-Le shell Preact est entièrement en flex, sans défilement global. Seules la palette, le panneau actif, l’inspecteur et la prévisualisation horizontale possèdent leur propre défilement.
+Le shell Preact est entièrement en flex, sans défilement global. Seules la palette, le panneau actif et l’inspecteur défilent verticalement. L’aperçu utilise toute la largeur disponible et réduit proportionnellement la barre si nécessaire, sans scroll horizontal.
 
 Fonctions principales :
 
@@ -96,8 +101,13 @@ Fonctions principales :
 - formulaire, JSON brut, simulation et journal d’événements ;
 - brouillon local, undo/redo et autosave avec contrôle de révision ;
 - diagnostics en ligne et conservation locale d’un JSON invalide ;
-- aperçu optimiste, puis géométrie autoritaire renvoyée par AppKit ;
-- simulation descriptive des actions, sans exécution système.
+- aperçu optimiste, puis géométrie et rendus PNG autoritaires capturés depuis les vraies vues AppKit ;
+- simulation visuelle explicite, sans exécution système ;
+- journal distinguant les événements reçus de MMTMR de ceux produits localement par l’éditeur, sans afficher les scripts ni le texte de la configuration.
+
+L’onglet **Simulation** remplace seulement les valeurs visuelles comme l’heure, la batterie ou l’application active. Le bouton de description d’une action explique ce qu’un appui ferait, mais n’exécute jamais la frappe, l’URL ou le script.
+
+L’onglet **Événements** reçoit les notifications temps réel du serveur par WebSocket (`config.*`, `runtime.snapshot`, `server.error`) et ajoute aussi les opérations locales de l’éditeur. Les rafraîchissements répétitifs sont regroupés.
 
 ## Serveur local
 
@@ -131,6 +141,18 @@ npm run build
 ```
 
 Le build Vite produit `Web/dist`. La phase de build Xcode reconstruit l’éditeur puis copie son contenu dans `MMTMR.app/Contents/Resources/Editor`.
+
+Pour remplacer seulement le HTML/CSS/JavaScript d’une application déjà compilée :
+
+```bash
+./Tools/install-web-editor.sh ./MMTMR.app
+```
+
+Une instance déjà lancée sert immédiatement les nouveaux fichiers après actualisation du navigateur. Comme toute modification des ressources invalide la signature sur disque, il faut fournir une identité de signature en second argument avant de relancer cette copie :
+
+```bash
+./Tools/install-web-editor.sh ./MMTMR.app "Nom de l’identité de signature"
+```
 
 Les options suivantes sont réservées aux tests et builds Debug :
 

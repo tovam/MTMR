@@ -73,6 +73,30 @@ class ParseConfig: XCTestCase {
         }
     }
 
+    func testPhysicalSystemButtonsDecodeToNativeMediaKeys() throws {
+        let fixture = """
+            [
+              { "type": "brightnessDown" },
+              { "type": "brightnessUp" },
+              { "type": "volumeDown" },
+              { "type": "volumeUp" }
+            ]
+        """.data(using: .utf8)!
+
+        let items = try JSONDecoder().decode([BarItemDefinition].self, from: fixture)
+        // Stable NX auxiliary-key ABI values from IOKit/ev_keymap.h.
+        let expected: [Int32] = [3, 2, 1, 0]
+
+        XCTAssertEqual(items.count, expected.count)
+        for (item, keyCode) in zip(items, expected) {
+            guard case let .hidKey(actualCode)? = item.actions.first?.value else {
+                XCTFail("Predefined system button did not decode to a native media-key action")
+                continue
+            }
+            XCTAssertEqual(actualCode, keyCode)
+        }
+    }
+
     func testExtendedWidthForPredefinedItem() {
         let buttonKeycodeFixture = """
             [  { "type": "escape", "width": 110} ]

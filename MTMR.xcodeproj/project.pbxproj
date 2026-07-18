@@ -99,6 +99,7 @@
 		F20100000000000000000026 /* MMTMREditorServer.swift in Sources */ = {isa = PBXBuildFile; fileRef = F20000000000000000000026 /* MMTMREditorServer.swift */; };
 		F20100000000000000000031 /* ConfigurationServerAdapter.swift in Sources */ = {isa = PBXBuildFile; fileRef = F20000000000000000000031 /* ConfigurationServerAdapter.swift */; };
 		F20100000000000000000032 /* MMTMRConfigurationSchema.swift in Sources */ = {isa = PBXBuildFile; fileRef = F20000000000000000000032 /* MMTMRConfigurationSchema.swift */; };
+		F20100000000000000000034 /* InputDispatchCore.swift in Sources */ = {isa = PBXBuildFile; fileRef = F20000000000000000000034 /* InputDispatchCore.swift */; };
 		F20200000000000000000001 /* ConfigCodec.swift in Sources */ = {isa = PBXBuildFile; fileRef = F20000000000000000000001 /* ConfigCodec.swift */; };
 		F20200000000000000000002 /* ConfigContentHasher.swift in Sources */ = {isa = PBXBuildFile; fileRef = F20000000000000000000002 /* ConfigContentHasher.swift */; };
 		F20200000000000000000003 /* ConfigDocument.swift in Sources */ = {isa = PBXBuildFile; fileRef = F20000000000000000000003 /* ConfigDocument.swift */; };
@@ -120,9 +121,11 @@
 		F20200000000000000000026 /* MMTMREditorServer.swift in Sources */ = {isa = PBXBuildFile; fileRef = F20000000000000000000026 /* MMTMREditorServer.swift */; };
 		F20200000000000000000031 /* ConfigurationServerAdapter.swift in Sources */ = {isa = PBXBuildFile; fileRef = F20000000000000000000031 /* ConfigurationServerAdapter.swift */; };
 		F20200000000000000000032 /* MMTMRConfigurationSchema.swift in Sources */ = {isa = PBXBuildFile; fileRef = F20000000000000000000032 /* MMTMRConfigurationSchema.swift */; };
+		F20200000000000000000034 /* InputDispatchCore.swift in Sources */ = {isa = PBXBuildFile; fileRef = F20000000000000000000034 /* InputDispatchCore.swift */; };
 		F20200000000000000000041 /* ConfigurationCoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F20000000000000000000041 /* ConfigurationCoreTests.swift */; };
 		F20200000000000000000042 /* MMTMREditorServerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F20000000000000000000042 /* MMTMREditorServerTests.swift */; };
 		F20200000000000000000043 /* MMTMREditorServerNetworkTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F20000000000000000000043 /* MMTMREditorServerNetworkTests.swift */; };
+		F20200000000000000000044 /* InputDispatchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F20000000000000000000044 /* InputDispatchTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -224,9 +227,11 @@
 		F20000000000000000000026 /* MMTMREditorServer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MMTMREditorServer.swift; sourceTree = "<group>"; };
 		F20000000000000000000031 /* ConfigurationServerAdapter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConfigurationServerAdapter.swift; sourceTree = "<group>"; };
 		F20000000000000000000032 /* MMTMRConfigurationSchema.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MMTMRConfigurationSchema.swift; sourceTree = "<group>"; };
+		F20000000000000000000034 /* InputDispatchCore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputDispatchCore.swift; sourceTree = "<group>"; };
 		F20000000000000000000041 /* ConfigurationCoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConfigurationCoreTests.swift; sourceTree = "<group>"; };
 		F20000000000000000000042 /* MMTMREditorServerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MMTMREditorServerTests.swift; sourceTree = "<group>"; };
 		F20000000000000000000043 /* MMTMREditorServerNetworkTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MMTMREditorServerNetworkTests.swift; sourceTree = "<group>"; };
+		F20000000000000000000044 /* InputDispatchTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputDispatchTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -306,6 +311,7 @@
 				36C2ECDF207CB1B0003CDA33 /* defaultPreset.json */,
 				B082B252205C7D8000BC04DC /* AppDelegate.swift */,
 				B0A7E9A9205D6AA400EEF070 /* KeyPress.swift */,
+				F20000000000000000000034 /* InputDispatchCore.swift */,
 				36FEF871235A1CFC00A0ABCE /* AppSettings.swift */,
 				B059D623205E04F3006E6B86 /* CustomButtonTouchBarItem.swift */,
 				4CF222EC26CC43D40025BDA7 /* CPU.swift */,
@@ -328,6 +334,7 @@
 		B082B264205C7D8000BC04DC /* MTMRTests */ = {
 			isa = PBXGroup;
 			children = (
+				F20000000000000000000044 /* InputDispatchTests.swift */,
 				F20000000000000000000043 /* MMTMREditorServerNetworkTests.swift */,
 				F20000000000000000000042 /* MMTMREditorServerTests.swift */,
 				F20000000000000000000041 /* ConfigurationCoreTests.swift */,
@@ -604,6 +611,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				F20100000000000000000034 /* InputDispatchCore.swift in Sources */,
 				F20100000000000000000032 /* MMTMRConfigurationSchema.swift in Sources */,
 				F20100000000000000000031 /* ConfigurationServerAdapter.swift in Sources */,
 				F20100000000000000000026 /* MMTMREditorServer.swift in Sources */,
@@ -672,6 +680,8 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				F20200000000000000000044 /* InputDispatchTests.swift in Sources */,
+				F20200000000000000000034 /* InputDispatchCore.swift in Sources */,
 				F20200000000000000000043 /* MMTMREditorServerNetworkTests.swift in Sources */,
 				F20200000000000000000042 /* MMTMREditorServerTests.swift in Sources */,
 				F20200000000000000000041 /* ConfigurationCoreTests.swift in Sources */,

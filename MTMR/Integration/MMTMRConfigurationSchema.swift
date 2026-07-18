@@ -188,6 +188,7 @@ enum MMTMRConfigurationSchema {
             "title": stringProperty("Displayed title."),
             "matchAppId": stringProperty("Frontmost application bundle-id regex."),
             "notes": stringProperty("Editor-only notes."),
+            "editorName": stringProperty("Editor-only display name; never forwarded to the Touch Bar runtime."),
             "enabled": boolProperty(defaultValue: true),
         ]
         if includeActions {

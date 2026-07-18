@@ -139,9 +139,10 @@ final class MMTMREditorServer: @unchecked Sendable {
     }
 
     /// Allows the configuration coordinator to forward external file changes and
-    /// authoritative AppKit runtime snapshots to connected editor sessions.
-    func publish(_ event: ServerEvent) async {
-        await controller.events.publish(event)
+    /// authoritative AppKit runtime snapshots to connected editor sessions. A
+    /// complete cached snapshot can accompany a smaller live image delta.
+    func publish(_ event: ServerEvent, cachedRuntimeSnapshot: ServerEvent? = nil) async {
+        await controller.events.publish(event, cachedRuntimeSnapshot: cachedRuntimeSnapshot)
     }
 
     deinit {

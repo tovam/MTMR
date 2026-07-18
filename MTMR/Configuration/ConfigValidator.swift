@@ -15,7 +15,7 @@ struct ConfigValidator {
     ]
 
     private static let commonItemKeys: Set<String> = [
-        "id", "type", "actions", "notes", "enabled", "width", "image", "align",
+        "id", "type", "actions", "notes", "editorName", "enabled", "width", "image", "align",
         "bordered", "background", "title", "matchAppId"
     ]
 
@@ -41,7 +41,7 @@ struct ConfigValidator {
     private static let nonActionableItemTypes: Set<String> = ["dock", "volume", "brightness", "group", "swipe", "upnext"]
 
     private static let stringItemKeys: Set<String> = [
-        "notes", "background", "title", "matchAppId", "timeZone", "units", "api_key",
+        "notes", "editorName", "background", "title", "matchAppId", "timeZone", "units", "api_key",
         "icon_type", "formatTemplate", "locale", "filter", "direction"
     ]
     private static let numberItemKeys: Set<String> = [

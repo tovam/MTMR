@@ -3,6 +3,7 @@ import {
   ACTION_TRIGGERS,
   actionSchemaForType,
   defaultValueForSchema,
+  itemEditorName,
   itemSchemaForType,
   propertyType,
   resolveReference,
@@ -26,6 +27,7 @@ interface InspectorProps {
 const FALLBACK_PROPERTIES: Record<string, JsonSchema> = {
   id: { type: "string", title: "Identifiant", readOnly: true },
   type: { type: "string", title: "Type", readOnly: true },
+  editorName: { type: "string", title: "Nom dans l’éditeur", description: "Nom privé utilisé uniquement pour vous repérer dans MMTMR." },
   title: { type: "string", title: "Titre" },
   align: { type: "string", title: "Alignement", enum: ["left", "center", "right"] },
   width: { type: "number", title: "Largeur", minimum: 18 },
@@ -42,10 +44,35 @@ const ACTION_PROPERTY_LABELS: Record<string, string> = {
   executablePath: "Exécutable",
   shellArguments: "Arguments",
   url: "URL",
+  source: "Source",
+  refreshInterval: "Rafraîchissement (secondes)",
+  alternativeImages: "Images alternatives",
+  formatTemplate: "Format de l’heure",
+  timeZone: "Fuseau horaire",
+  locale: "Locale",
+  autoResize: "Largeur automatique",
+  filter: "Filtre d’applications",
+  units: "Unités",
+  api_key: "Clé API",
+  icon_type: "Type d’icône",
+  from: "Depuis",
+  to: "Vers",
+  full: "Affichage complet",
+  disableMarquee: "Désactiver le défilement",
+  items: "Éléments imbriqués",
+  workTime: "Durée de travail",
+  restTime: "Durée de repos",
+  flip: "Inverser montant et descendant",
+  direction: "Direction",
+  fingers: "Nombre de doigts",
+  minOffset: "Distance minimale",
+  sourceApple: "AppleScript",
+  sourceBash: "Script shell",
+  maxToShow: "Nombre maximal",
 };
 
 function fieldLabel(key: string, schema?: JsonSchema): string {
-  return schema?.title ?? ACTION_PROPERTY_LABELS[key] ?? FALLBACK_PROPERTIES[key]?.title ?? key;
+  return ACTION_PROPERTY_LABELS[key] ?? FALLBACK_PROPERTIES[key]?.title ?? schema?.title ?? key;
 }
 
 function childPath(parent: string | undefined, child: string): string | undefined {
@@ -87,7 +114,7 @@ function valueFromInput(type: string, input: HTMLInputElement | HTMLSelectElemen
   return input.value;
 }
 
-function StructuredValue({ value, onChange }: { value: JsonValue; onChange(value: JsonValue): void }) {
+function StructuredValue({ value, label, onChange }: { value: JsonValue; label: string; onChange(value: JsonValue): void }) {
   const [text, setText] = useState(() => JSON.stringify(value, null, 2));
   const [invalid, setInvalid] = useState(false);
   useEffect(() => setText(JSON.stringify(value, null, 2)), [value]);
@@ -95,6 +122,7 @@ function StructuredValue({ value, onChange }: { value: JsonValue; onChange(value
     <textarea
       class={invalid ? "field-invalid mono-field" : "mono-field"}
       rows={5}
+      aria-label={label}
       value={text}
       onInput={(event) => {
         const source = event.currentTarget.value;
@@ -138,6 +166,7 @@ function PropertyField({
   const sourceProperties = resolvedSchema?.properties ?? {};
   const isSource = ["filePath", "base64", "inline"].every((key) => key in sourceProperties);
   const hasErrors = diagnostics.some((entry) => entry.severity === "error");
+  const effectiveBoolean = value === true || (value === undefined && resolvedSchema?.default === true);
 
   if (isSource) {
     const object = typeof value === "object" && value !== null && !Array.isArray(value)
@@ -187,7 +216,7 @@ function PropertyField({
   }
 
   return (
-    <label class={`property-field property-${type} ${hasErrors ? "field-invalid" : ""}`}>
+    <div class={`property-field property-${type} ${hasErrors ? "field-invalid" : ""}`}>
       <span class="field-label">
         <span>{label}{required && <span class="required-mark"> *</span>}</span>
         {canUnset && <button type="button" class="unset-button" onClick={onUnset}>Réinitialiser</button>}
@@ -197,15 +226,17 @@ function PropertyField({
         <span class="switch-row">
           <input
             type="checkbox"
-            checked={value === true || (value === undefined && resolvedSchema?.default === true)}
+            aria-label={label}
+            checked={effectiveBoolean}
             disabled={resolvedSchema?.readOnly}
             aria-invalid={hasErrors}
             onChange={(event) => onChange(event.currentTarget.checked)}
           />
-          <span>{value === true ? "Oui" : "Non"}</span>
+          <span>{effectiveBoolean ? "Oui" : "Non"}</span>
         </span>
       ) : resolvedSchema?.enum ? (
         <select
+          aria-label={label}
           value={value === undefined ? "" : String(value)}
           disabled={resolvedSchema.readOnly}
           aria-invalid={hasErrors}
@@ -217,6 +248,7 @@ function PropertyField({
       ) : type === "number" || type === "integer" ? (
         <input
           type="number"
+          aria-label={label}
           value={typeof value === "number" ? value : ""}
           min={resolvedSchema?.minimum}
           max={resolvedSchema?.maximum}
@@ -226,9 +258,10 @@ function PropertyField({
           onInput={(event) => onChange(valueFromInput(type, event.currentTarget))}
         />
       ) : type === "array" || type === "object" ? (
-        <StructuredValue value={value ?? (type === "array" ? [] : {})} onChange={onChange} />
+        <StructuredValue value={value ?? (type === "array" ? [] : {})} label={label} onChange={onChange} />
       ) : name === "notes" || name.toLowerCase().includes("script") ? (
         <textarea
+          aria-label={label}
           rows={name === "notes" ? 3 : 6}
           value={typeof value === "string" ? value : ""}
           readOnly={resolvedSchema?.readOnly}
@@ -238,6 +271,7 @@ function PropertyField({
       ) : (
         <input
           type="text"
+          aria-label={label}
           value={value === undefined ? "" : String(value)}
           readOnly={resolvedSchema?.readOnly}
           minlength={resolvedSchema?.minLength}
@@ -247,7 +281,7 @@ function PropertyField({
         />
       )}
       <InlineDiagnostics diagnostics={diagnostics} />
-    </label>
+    </div>
   );
 }
 
@@ -397,6 +431,28 @@ function ActionsEditor({
   );
 }
 
+function AppleToggle({
+  label,
+  detail,
+  checked,
+  onChange,
+}: {
+  label: string;
+  detail: string;
+  checked: boolean;
+  onChange(value: boolean): void;
+}) {
+  return (
+    <label class="apple-toggle-row">
+      <span><strong>{label}</strong><small>{detail}</small></span>
+      <span class="apple-toggle">
+        <input type="checkbox" role="switch" checked={checked} onChange={(event) => onChange(event.currentTarget.checked)} />
+        <span aria-hidden="true" />
+      </span>
+    </label>
+  );
+}
+
 export function Inspector({
   item,
   itemPath,
@@ -412,10 +468,13 @@ export function Inspector({
   const itemSchema = useMemo(() => item ? itemSchemaForType(schema, item.type) : undefined, [item, schema]);
   const properties = useMemo(() => {
     if (!item) return {};
+    const fallbackKeys = Object.keys(FALLBACK_PROPERTIES).filter((key) => (
+      key !== "editorName" || itemSchema?.properties?.editorName !== undefined
+    ));
     const keys = new Set([
-      ...Object.keys(FALLBACK_PROPERTIES),
+      ...fallbackKeys,
       ...Object.keys(itemSchema?.properties ?? {}),
-      ...Object.keys(item),
+      ...Object.keys(item).filter((key) => key !== "editorName" || itemSchema?.properties?.editorName !== undefined),
     ]);
     return Object.fromEntries([...keys].map((key) => [
       key,
@@ -423,6 +482,19 @@ export function Inspector({
     ])) as Record<string, JsonSchema>;
   }, [item, itemSchema]);
   const supportsActions = schema ? itemSchema?.properties?.actions !== undefined : true;
+  const orderedProperties = useMemo(() => {
+    const preferred = [
+      "editorName", "title", "notes", "align", "width", "image", "background", "matchAppId",
+      "source", "refreshInterval", "formatTemplate", "timeZone", "locale", "alternativeImages",
+      "autoResize", "filter", "units", "api_key", "icon_type", "from", "to", "full",
+      "disableMarquee", "items", "workTime", "restTime", "flip", "direction", "fingers",
+      "minOffset", "sourceApple", "sourceBash", "maxToShow", "id", "type",
+    ];
+    const rank = new Map(preferred.map((name, index) => [name, index]));
+    return Object.entries(properties)
+      .filter(([name]) => !["actions", "enabled", "bordered"].includes(name))
+      .sort(([left], [right]) => (rank.get(left) ?? 1_000) - (rank.get(right) ?? 1_000));
+  }, [properties]);
 
   return (
     <aside class={`inspector side-panel ${collapsed ? "is-collapsed" : ""}`} aria-label="Inspecteur">
@@ -445,7 +517,7 @@ export function Inspector({
               <div class="inspector-title">
                 <div>
                   <span class="eyebrow">{item.type}</span>
-                  <h2>{typeof item.title === "string" && item.title ? item.title : "Sans titre"}</h2>
+                  <h2>{itemEditorName(item)}</h2>
                 </div>
                 <span class={`enabled-dot ${item.enabled === false ? "off" : ""}`} title={item.enabled === false ? "Désactivé" : "Activé"} />
               </div>
@@ -453,11 +525,23 @@ export function Inspector({
                 <button class="small-button" onClick={onDuplicate}>Dupliquer</button>
                 <button class="small-button danger" onClick={onDelete}>Supprimer</button>
               </div>
+              <div class="inspector-primary-toggles">
+                <AppleToggle
+                  label="Élément actif"
+                  detail="Visible dans la Touch Bar"
+                  checked={item.enabled !== false}
+                  onChange={(enabled) => onChange({ ...item, enabled })}
+                />
+                <AppleToggle
+                  label="Bordure"
+                  detail="Contour du bouton natif"
+                  checked={item.bordered !== false}
+                  onChange={(bordered) => onChange({ ...item, bordered })}
+                />
+              </div>
               <InlineDiagnostics diagnostics={diagnosticsAtPath(diagnostics, itemPath, false)} />
               <div class="property-list">
-                {Object.entries(properties)
-                  .filter(([name]) => name !== "actions")
-                  .map(([name, propertySchema]) => (
+                {orderedProperties.map(([name, propertySchema]) => (
                     <PropertyField
                       key={name}
                       name={name}

@@ -48,6 +48,7 @@ struct ConfigDocument: Codable, Equatable, Sendable {
             }
             return RuntimeConfigItem(
                 id: item.id,
+                kind: item.type,
                 sourcePath: sourcePath,
                 data: data,
                 fingerprint: ConfigContentHasher.sha256(fingerprintData)
@@ -101,16 +102,22 @@ private extension Dictionary where Key == String, Value == JSONValue {
 
 struct RuntimeConfigItem: Equatable, Sendable {
     let id: String
+    let kind: String
     let sourcePath: String
     let data: Data
     let fingerprint: String
 }
 
 struct ConfigItem: Codable, Equatable, Sendable {
+    private static let reservedKeys = Set([
+        "id", "type", "actions", "notes", "editorName", "enabled", "items",
+    ])
+
     var id: String
     var type: String
     var actions: [ConfigAction]
     var notes: String?
+    var editorName: String?
     var enabled: Bool?
     var items: [ConfigItem]?
     var properties: [String: JSONValue]
@@ -120,6 +127,7 @@ struct ConfigItem: Codable, Equatable, Sendable {
         type: String,
         actions: [ConfigAction] = [],
         notes: String? = nil,
+        editorName: String? = nil,
         enabled: Bool? = nil,
         items: [ConfigItem]? = nil,
         properties: [String: JSONValue] = [:]
@@ -128,9 +136,10 @@ struct ConfigItem: Codable, Equatable, Sendable {
         self.type = type
         self.actions = actions
         self.notes = notes
+        self.editorName = editorName
         self.enabled = enabled
         self.items = items
-        self.properties = properties
+        self.properties = properties.filter { !Self.reservedKeys.contains($0.key) }
     }
 
     init(from decoder: Decoder) throws {
@@ -139,12 +148,12 @@ struct ConfigItem: Codable, Equatable, Sendable {
         type = try container.decode(String.self, forKey: DynamicCodingKey("type"))
         actions = try container.decodeIfPresent([ConfigAction].self, forKey: DynamicCodingKey("actions")) ?? []
         notes = try container.decodeIfPresent(String.self, forKey: DynamicCodingKey("notes"))
+        editorName = try container.decodeIfPresent(String.self, forKey: DynamicCodingKey("editorName"))
         enabled = try container.decodeIfPresent(Bool.self, forKey: DynamicCodingKey("enabled"))
         items = try container.decodeIfPresent([ConfigItem].self, forKey: DynamicCodingKey("items"))
 
-        let reserved = Set(["id", "type", "actions", "notes", "enabled", "items"])
         properties = try container.allKeys.reduce(into: [:]) { result, key in
-            guard !reserved.contains(key.stringValue) else { return }
+            guard !Self.reservedKeys.contains(key.stringValue) else { return }
             result[key.stringValue] = try container.decode(JSONValue.self, forKey: key)
         }
     }
@@ -157,6 +166,7 @@ struct ConfigItem: Codable, Equatable, Sendable {
             try container.encode(actions, forKey: DynamicCodingKey("actions"))
         }
         try container.encodeIfPresent(notes, forKey: DynamicCodingKey("notes"))
+        try container.encodeIfPresent(editorName, forKey: DynamicCodingKey("editorName"))
         try container.encodeIfPresent(enabled, forKey: DynamicCodingKey("enabled"))
         try container.encodeIfPresent(items, forKey: DynamicCodingKey("items"))
         for (key, value) in properties {

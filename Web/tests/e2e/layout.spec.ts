@@ -73,10 +73,53 @@ test("seules les régions prévues déclarent leur propre overflow", async ({ pa
   });
   expect(styles.body).toEqual({ x: "hidden", y: "hidden" });
   expect(styles.palette.y).toBe("auto");
-  expect(styles.preview.x).toBe("auto");
+  expect(styles.preview.x).toBe("hidden");
   expect(styles.preview.y).toBe("hidden");
   expect(styles.panel.y).toBe("auto");
   expect(styles.inspector.y).toBe("auto");
+});
+
+test("l’aperçu prend toute la page et réduit la barre sans débordement horizontal", async ({ page }) => {
+  await expect.poll(async () => Number(await page.getByTestId("preview-scroll").getAttribute("data-fit-scale"))).toBeLessThan(1);
+  const result = await page.evaluate(() => {
+    const preview = document.querySelector<HTMLElement>("[data-testid=preview-scroll]")!;
+    const shell = document.querySelector<HTMLElement>(".preview-shell")!;
+    const frame = document.querySelector<HTMLElement>(".touchbar-frame")!;
+    const itemRects = [...document.querySelectorAll<HTMLElement>(".touch-item")].map((item) => item.getBoundingClientRect());
+    const frameRect = frame.getBoundingClientRect();
+    return {
+      preview: [preview.clientWidth, preview.scrollWidth],
+      shell: { x: shell.getBoundingClientRect().x, width: shell.getBoundingClientRect().width },
+      scale: Number(preview.dataset.fitScale),
+      itemsInside: itemRects.every((rect) => rect.left >= frameRect.left - 1 && rect.right <= frameRect.right + 1),
+      viewportWidth: window.innerWidth,
+    };
+  });
+  expect(result.preview[0]).toBe(result.preview[1]);
+  expect(result.shell.x).toBe(0);
+  expect(result.shell.width).toBe(result.viewportWidth);
+  expect(result.scale).toBeGreaterThan(0);
+  expect(result.scale).toBeLessThan(1);
+  expect(result.itemsInside).toBe(true);
+});
+
+test("le thème argenté ne contient ni gradient ni halo", async ({ page }) => {
+  const visuals = await page.evaluate(() => {
+    const read = (selector: string) => {
+      const style = getComputedStyle(document.querySelector(selector)!);
+      return { backgroundImage: style.backgroundImage, boxShadow: style.boxShadow };
+    };
+    return {
+      shell: read(".app-shell"),
+      preview: read(".preview-shell"),
+      frame: read(".touchbar-frame"),
+      item: read(".touch-item"),
+    };
+  });
+  for (const style of Object.values(visuals)) {
+    expect(style.backgroundImage).toBe("none");
+    expect(style.boxShadow).toBe("none");
+  }
 });
 
 test("le header et le footer conservent leur hauteur fixe", async ({ page }) => {

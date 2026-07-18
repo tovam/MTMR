@@ -157,6 +157,7 @@ class CustomButtonTouchBarItem: NSCustomTouchBarItem, NSGestureRecognizerDelegat
     @objc func handleGestureLong(gr: NSPressGestureRecognizer) {
         switch gr.state {
         case .possible: // tiny hack because we're calling action manually
+            multiClick.suppressCurrentTouchSequence()
             callActions(for: .longTap)
             break
         default:
@@ -213,7 +214,7 @@ final class MultiClickGestureRecognizer: NSClickGestureRecognizer {
     private let _action: Selector
     private let _doubleAction: Selector
     private let _tripleAction: Selector
-    private var _clickCount: Int = 0
+    private var sequenceState = TouchTapSequenceState()
     
     public var isDoubleClickEnabled = true
     public var isTripleClickEnabled = true
@@ -247,7 +248,7 @@ final class MultiClickGestureRecognizer: NSClickGestureRecognizer {
     override func touchesEnded(with event: NSEvent) {
         HapticFeedback.instance.tap(type: .back)
         super.touchesEnded(with: event)
-        _clickCount += 1
+        guard let clickCount = sequenceState.recordTouchEnd() else { return }
         
         var delayThreshold: TimeInterval // fine tune this as needed
         
@@ -259,26 +260,45 @@ final class MultiClickGestureRecognizer: NSClickGestureRecognizer {
         if (isTripleClickEnabled) {
             delayThreshold = 0.4
             perform(#selector(_resetAndPerformActionIfNecessary), with: nil, afterDelay: delayThreshold)
-            if _clickCount == 3 {
+            if clickCount == 3 {
                 _ = target?.perform(_tripleAction)
             }
         } else {
             delayThreshold = 0.3
             perform(#selector(_resetAndPerformActionIfNecessary), with: nil, afterDelay: delayThreshold)
-            if _clickCount == 2 {
+            if clickCount == 2 {
                 _ = target?.perform(_doubleAction)
             }
         }
     }
 
+    override func touchesCancelled(with event: NSEvent) {
+        sequenceState.reset()
+        NSObject.cancelPreviousPerformRequests(
+            withTarget: self,
+            selector: #selector(_resetAndPerformActionIfNecessary),
+            object: nil
+        )
+        super.touchesCancelled(with: event)
+    }
+
+    func suppressCurrentTouchSequence() {
+        sequenceState.suppressCurrentTouchSequence()
+        NSObject.cancelPreviousPerformRequests(
+            withTarget: self,
+            selector: #selector(_resetAndPerformActionIfNecessary),
+            object: nil
+        )
+    }
+
     @objc private func _resetAndPerformActionIfNecessary() {
-        if _clickCount == 1 {
+        if sequenceState.clickCount == 1 {
             _ = target?.perform(_action)
         }
-        if isTripleClickEnabled && _clickCount == 2 {
+        if isTripleClickEnabled && sequenceState.clickCount == 2 {
             _ = target?.perform(_doubleAction)
         }
-        _clickCount = 0
+        sequenceState.reset()
     }
 }
 

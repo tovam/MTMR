@@ -69,7 +69,28 @@ describe("modèle de configuration", () => {
     };
     const item = createItem("testButton", schema);
     expect(item).toMatchObject({ type: "testButton", align: "left", enabled: true, width: 42 });
-    expect(schemaItemTypes(schema)).toContainEqual({ type: "testButton", label: "Bouton test", icon: "◇" });
+    expect(schemaItemTypes(schema)).toContainEqual(expect.objectContaining({ type: "testButton", label: "Bouton test", icon: "•" }));
+    expect(item).not.toHaveProperty("editorName");
     expect(addItem({ formatVersion: 1, items: [] }, item, "center").items[0].align).toBe("center");
+  });
+
+  it("n’ajoute editorName que lorsque le schéma du binaire le permet", () => {
+    const oldSchema: JsonSchema = {
+      properties: { items: { items: { oneOf: [{ properties: { type: { const: "staticButton" } } }] } } },
+    };
+    const newSchema: JsonSchema = {
+      properties: { items: { items: { oneOf: [{ properties: { type: { const: "staticButton" }, editorName: { type: "string" } } }] } } },
+    };
+    expect(createItem("staticButton", oldSchema)).not.toHaveProperty("editorName");
+    expect(createItem("staticButton", newSchema)).toMatchObject({ editorName: "Bouton statique" });
+  });
+
+  it("déclare les 38 composants avec des libellés français et des icônes distinctes", () => {
+    const entries = schemaItemTypes();
+    expect(entries).toHaveLength(38);
+    expect(entries.find((entry) => entry.type === "volumeUp")).toMatchObject({ label: "Volume +", icon: "🔊" });
+    expect(entries.find((entry) => entry.type === "volumeDown")).toMatchObject({ label: "Volume −", icon: "🔉" });
+    expect(entries.every((entry) => entry.icon !== "◇" && entry.description.length > 0 && entry.examples.length > 0)).toBe(true);
+    expect(new Set(entries.map((entry) => entry.icon)).size).toBe(38);
   });
 });
