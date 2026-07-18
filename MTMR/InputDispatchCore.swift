@@ -88,32 +88,95 @@ struct TouchTapSequenceState: Equatable, Sendable {
     }
 }
 
-enum TouchBarPhysicalZone: Int, CaseIterable, Sendable {
-    case left
-    case center
-    case right
+struct TouchBarZoneWidths: Equatable, Sendable {
+    let left: CGFloat
+    let center: CGFloat
+    let right: CGFloat
 }
 
-/// The physical Touch Bar is split into three real, equal regions. This keeps
-/// `align` semantic: a large left-side component may compress inside the left
-/// third, but it can no longer push later left items into the right region.
+struct TouchBarZoneFrames: Equatable, Sendable {
+    let left: CGRect
+    let center: CGRect
+    let right: CGRect
+}
+
+/// Positions the three logical groups in one full-width coordinate space.
+/// Left and right grow inwards from the actual visible edges; center always
+/// stays on the physical midpoint. A frame narrower than its natural width is
+/// a signal for the corresponding group to become horizontally scrollable.
 struct TouchBarPhysicalLayout: Sendable {
     static let preferredWidth: CGFloat = 1_085
     static let preferredHeight: CGFloat = 30
+    static let groupSpacing: CGFloat = 2
 
-    static func frame(
-        for zone: TouchBarPhysicalZone,
-        containerWidth: CGFloat,
-        containerHeight: CGFloat
-    ) -> CGRect {
-        let safeWidth = max(0, containerWidth)
-        let safeHeight = max(0, containerHeight)
-        let zoneWidth = safeWidth / CGFloat(TouchBarPhysicalZone.allCases.count)
-        return CGRect(
-            x: zoneWidth * CGFloat(zone.rawValue),
-            y: 0,
-            width: zoneWidth,
-            height: safeHeight
+    static func visibleBounds(bounds: CGRect, visibleRect: CGRect) -> CGRect {
+        let intersection = bounds.intersection(visibleRect)
+        guard !intersection.isNull, intersection.width > 0, intersection.height > 0 else {
+            return CGRect(
+                x: bounds.minX,
+                y: bounds.minY,
+                width: max(0, bounds.width),
+                height: max(0, bounds.height)
+            )
+        }
+        return intersection
+    }
+
+    static func frames(
+        in containerRect: CGRect,
+        naturalWidths: TouchBarZoneWidths,
+        spacing: CGFloat = groupSpacing
+    ) -> TouchBarZoneFrames {
+        let rect = CGRect(
+            x: containerRect.minX,
+            y: containerRect.minY,
+            width: max(0, containerRect.width),
+            height: max(0, containerRect.height)
+        )
+        let leftNatural = max(0, naturalWidths.left)
+        let centerNatural = max(0, naturalWidths.center)
+        let rightNatural = max(0, naturalWidths.right)
+        let safeSpacing = max(0, spacing)
+
+        guard rect.width > 0 else {
+            return TouchBarZoneFrames(left: .zero, center: .zero, right: .zero)
+        }
+
+        if centerNatural > 0 {
+            let centerWidth = min(centerNatural, rect.width)
+            let center = CGRect(
+                x: rect.midX - centerWidth / 2,
+                y: rect.minY,
+                width: centerWidth,
+                height: rect.height
+            )
+            let leftCapacity = max(0, center.minX - rect.minX - safeSpacing)
+            let rightCapacity = max(0, rect.maxX - center.maxX - safeSpacing)
+            let leftWidth = min(leftNatural, leftCapacity)
+            let rightWidth = min(rightNatural, rightCapacity)
+            return TouchBarZoneFrames(
+                left: CGRect(x: rect.minX, y: rect.minY, width: leftWidth, height: rect.height),
+                center: center,
+                right: CGRect(x: rect.maxX - rightWidth, y: rect.minY, width: rightWidth, height: rect.height)
+            )
+        }
+
+        let available = max(0, rect.width - (leftNatural > 0 && rightNatural > 0 ? safeSpacing : 0))
+        let allocated: (left: CGFloat, right: CGFloat)
+        if leftNatural + rightNatural <= available {
+            allocated = (leftNatural, rightNatural)
+        } else if leftNatural <= available / 2 {
+            allocated = (leftNatural, min(rightNatural, available - leftNatural))
+        } else if rightNatural <= available / 2 {
+            allocated = (min(leftNatural, available - rightNatural), rightNatural)
+        } else {
+            allocated = (min(leftNatural, available / 2), min(rightNatural, available / 2))
+        }
+
+        return TouchBarZoneFrames(
+            left: CGRect(x: rect.minX, y: rect.minY, width: allocated.left, height: rect.height),
+            center: CGRect(x: rect.midX, y: rect.minY, width: 0, height: rect.height),
+            right: CGRect(x: rect.maxX - allocated.right, y: rect.minY, width: allocated.right, height: rect.height)
         )
     }
 }

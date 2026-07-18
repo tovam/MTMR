@@ -137,7 +137,6 @@ class TouchBarController: NSObject, NSTouchBarDelegate {
     var centerIdentifiers: [NSTouchBarItem.Identifier] = []
     var rightIdentifiers: [NSTouchBarItem.Identifier] = []
     let basicViewIdentifier = NSTouchBarItem.Identifier("com.tovam.MMTMR.scrollView")
-    private let centerScrollAreaIdentifier = NSTouchBarItem.Identifier("com.tovam.MMTMR.scrollArea")
     var basicView: BasicView?
     var swipeItems: [SwipeItem] = []
 
@@ -242,8 +241,6 @@ class TouchBarController: NSObject, NSTouchBarDelegate {
             items[identifier]
         })
 
-        let scrollArea = ScrollViewItem(identifier: centerScrollAreaIdentifier, items: centerItems)
-
         let leftItems = leftIdentifiers.compactMap({ (identifier) -> NSTouchBarItem? in
             items[identifier]
         })
@@ -251,11 +248,10 @@ class TouchBarController: NSObject, NSTouchBarDelegate {
             items[identifier]
         })
 
-        let visibleCenterItems: [NSTouchBarItem] = centerItems.isEmpty ? [] : [scrollArea]
         if let basicView {
             basicView.update(
                 leftItems: leftItems,
-                centerItems: visibleCenterItems,
+                centerItems: centerItems,
                 rightItems: rightItems,
                 swipeItems: swipeItems
             )
@@ -263,7 +259,7 @@ class TouchBarController: NSObject, NSTouchBarDelegate {
             basicView = BasicView(
                 identifier: basicViewIdentifier,
                 leftItems: leftItems,
-                centerItems: visibleCenterItems,
+                centerItems: centerItems,
                 rightItems: rightItems,
                 swipeItems: swipeItems
             )

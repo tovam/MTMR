@@ -7,15 +7,247 @@
 //
 
 import AppKit
+import QuartzCore
+
+extension Notification.Name {
+    static let mmtmrTouchBarContentSizeDidChange = Notification.Name("com.tovam.MMTMR.touchBarContentSizeDidChange")
+}
+
+private final class TouchBarZoneContentView: NSView {
+    private(set) var itemViews: [NSView] = []
+    private(set) var naturalSize = NSSize.zero
+    private let spacing: CGFloat = TouchBarPhysicalLayout.groupSpacing
+
+    func update(views: [NSView]) {
+        itemViews.forEach { $0.removeFromSuperview() }
+        itemViews = views
+        for view in views {
+            view.translatesAutoresizingMaskIntoConstraints = true
+            addSubview(view)
+        }
+        measure()
+    }
+
+    @discardableResult
+    func measure() -> NSSize {
+        let sizes = itemViews.map(Self.preferredSize)
+        let totalSpacing = spacing * CGFloat(max(0, sizes.count - 1))
+        naturalSize = NSSize(
+            width: sizes.reduce(totalSpacing) { $0 + $1.width },
+            height: sizes.map(\.height).max() ?? TouchBarPhysicalLayout.preferredHeight
+        )
+        return naturalSize
+    }
+
+    func layoutItems(height: CGFloat) {
+        let sizes = itemViews.map(Self.preferredSize)
+        let totalSpacing = spacing * CGFloat(max(0, sizes.count - 1))
+        naturalSize = NSSize(
+            width: sizes.reduce(totalSpacing) { $0 + $1.width },
+            height: sizes.map(\.height).max() ?? TouchBarPhysicalLayout.preferredHeight
+        )
+        frame.size = NSSize(width: naturalSize.width, height: max(0, height))
+
+        var x: CGFloat = 0
+        for (view, preferredSize) in zip(itemViews, sizes) {
+            let itemHeight = min(max(0, preferredSize.height), max(0, height))
+            view.frame = NSRect(
+                x: x,
+                y: max(0, (height - itemHeight) / 2),
+                width: max(0, preferredSize.width),
+                height: itemHeight
+            )
+            x += preferredSize.width + spacing
+        }
+    }
+
+    private static func preferredSize(of view: NSView) -> NSSize {
+        NSSize(width: preferredWidth(of: view), height: preferredHeight(of: view))
+    }
+
+    private static func preferredWidth(of view: NSView) -> CGFloat {
+        if let width = requiredConstant(for: .width, in: view) {
+            return max(0, width)
+        }
+        if let scrollView = view as? NSScrollView {
+            let documentWidth = scrollView.documentView?.fittingSize.width ?? 0
+            if documentWidth.isFinite, documentWidth > 0 {
+                return documentWidth
+            }
+        }
+        let candidates = [view.fittingSize.width, view.intrinsicContentSize.width, view.frame.width]
+        return max(0, candidates.first(where: { $0.isFinite && $0 > 0 }) ?? 0)
+    }
+
+    private static func preferredHeight(of view: NSView) -> CGFloat {
+        if let height = requiredConstant(for: .height, in: view) {
+            return max(0, height)
+        }
+        let candidates = [view.fittingSize.height, view.intrinsicContentSize.height, view.frame.height]
+        return max(
+            0,
+            candidates.first(where: { $0.isFinite && $0 > 0 }) ?? TouchBarPhysicalLayout.preferredHeight
+        )
+    }
+
+    private static func requiredConstant(
+        for attribute: NSLayoutConstraint.Attribute,
+        in view: NSView
+    ) -> CGFloat? {
+        let constants = view.constraints.compactMap { constraint -> CGFloat? in
+            guard constraint.isActive,
+                  constraint.priority == .required,
+                  constraint.relation == .equal,
+                  constraint.secondItem == nil,
+                  constraint.firstItem === view,
+                  constraint.firstAttribute == attribute
+            else { return nil }
+            return constraint.constant
+        }
+        // A dynamic script item may temporarily activate a zero-width hide
+        // constraint alongside its configured width. In that case hiding wins.
+        return constants.min()
+    }
+}
+
+private final class TouchBarZoneScrollView: NSScrollView {
+    enum Anchor: Equatable {
+        case leading
+        case center
+        case trailing
+    }
+
+    private let zoneAnchor: Anchor
+    private let zoneContent = TouchBarZoneContentView()
+    private var hasEstablishedScrollPosition = false
+
+    var naturalWidth: CGFloat {
+        zoneContent.measure().width
+    }
+
+    var hasItems: Bool {
+        !zoneContent.itemViews.isEmpty
+    }
+
+    init(anchor: Anchor) {
+        zoneAnchor = anchor
+        super.init(frame: .zero)
+        drawsBackground = false
+        borderType = .noBorder
+        hasHorizontalScroller = false
+        hasVerticalScroller = false
+        autohidesScrollers = true
+        horizontalScrollElasticity = .automatic
+        verticalScrollElasticity = .none
+        contentView.postsBoundsChangedNotifications = true
+        documentView = zoneContent
+        wantsLayer = true
+        layer?.masksToBounds = true
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(clipBoundsDidChange(_:)),
+            name: NSView.boundsDidChangeNotification,
+            object: contentView
+        )
+    }
+
+    required init?(coder _: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    deinit {
+        NotificationCenter.default.removeObserver(self)
+    }
+
+    func update(views: [NSView]) {
+        zoneContent.update(views: views)
+        hasEstablishedScrollPosition = false
+        needsLayout = true
+    }
+
+    override func layout() {
+        super.layout()
+        let oldMaximumOffset = maximumHorizontalOffset
+        let oldOffset = contentView.bounds.minX
+        let wasAtTrailingEdge = oldMaximumOffset > 0 && oldOffset >= oldMaximumOffset - 0.5
+
+        zoneContent.layoutItems(height: contentSize.height)
+        let newMaximumOffset = maximumHorizontalOffset
+        let nextOffset: CGFloat
+        if !hasEstablishedScrollPosition {
+            switch zoneAnchor {
+            case .leading: nextOffset = 0
+            case .center: nextOffset = newMaximumOffset / 2
+            case .trailing: nextOffset = newMaximumOffset
+            }
+            hasEstablishedScrollPosition = true
+        } else if zoneAnchor == .trailing && (wasAtTrailingEdge || oldMaximumOffset == 0) {
+            nextOffset = newMaximumOffset
+        } else {
+            nextOffset = min(max(0, oldOffset), newMaximumOffset)
+        }
+        contentView.scroll(to: NSPoint(x: nextOffset, y: 0))
+        reflectScrolledClipView(contentView)
+        updateFadeMask()
+    }
+
+    override func reflectScrolledClipView(_ clipView: NSClipView) {
+        super.reflectScrolledClipView(clipView)
+        updateFadeMask()
+    }
+
+    private var maximumHorizontalOffset: CGFloat {
+        max(0, zoneContent.frame.width - contentSize.width)
+    }
+
+    @objc private func clipBoundsDidChange(_: Notification) {
+        updateFadeMask()
+    }
+
+    private func updateFadeMask() {
+        guard bounds.width > 0 else {
+            layer?.mask = nil
+            return
+        }
+        let maximumOffset = maximumHorizontalOffset
+        let currentOffset = contentView.bounds.minX
+        let hasLeadingOverflow = currentOffset > 0.5
+        let hasTrailingOverflow = currentOffset < maximumOffset - 0.5
+        guard hasLeadingOverflow || hasTrailingOverflow else {
+            layer?.mask = nil
+            return
+        }
+
+        let transparent = NSColor.black.withAlphaComponent(0).cgColor
+        let opaque = NSColor.black.cgColor
+        let gradient = CAGradientLayer()
+        gradient.frame = bounds
+        gradient.startPoint = CGPoint(x: 0, y: 0.5)
+        gradient.endPoint = CGPoint(x: 1, y: 0.5)
+        switch (hasLeadingOverflow, hasTrailingOverflow) {
+        case (true, true):
+            gradient.colors = [transparent, opaque, opaque, transparent]
+            gradient.locations = [0, 0.08, 0.92, 1]
+        case (true, false):
+            gradient.colors = [transparent, opaque, opaque]
+            gradient.locations = [0, 0.08, 1]
+        case (false, true):
+            gradient.colors = [opaque, opaque, transparent]
+            gradient.locations = [0, 0.92, 1]
+        case (false, false):
+            return
+        }
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        layer?.mask = gradient
+        CATransaction.commit()
+    }
+}
 
 private final class TouchBarZonesView: NSView {
-    private let leftContainer = NSView()
-    private let centerContainer = NSView()
-    private let rightContainer = NSView()
-    private let leftStack = TouchBarZonesView.makeStack()
-    private let centerStack = TouchBarZonesView.makeStack()
-    private let rightStack = TouchBarZonesView.makeStack()
-    private var fillWidthConstraints: [ObjectIdentifier: NSLayoutConstraint] = [:]
+    private let leftZone = TouchBarZoneScrollView(anchor: .leading)
+    private let centerZone = TouchBarZoneScrollView(anchor: .center)
+    private let rightZone = TouchBarZoneScrollView(anchor: .trailing)
 
     override var intrinsicContentSize: NSSize {
         NSSize(
@@ -26,14 +258,17 @@ private final class TouchBarZonesView: NSView {
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
-        [leftContainer, centerContainer, rightContainer].forEach { container in
-            container.wantsLayer = true
-            container.layer?.masksToBounds = true
-            addSubview(container)
+        setContentHuggingPriority(.defaultLow, for: .horizontal)
+        setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        [leftZone, centerZone, rightZone].forEach { zone in
+            addSubview(zone)
         }
-        install(leftStack, in: leftContainer, alignment: .left)
-        install(centerStack, in: centerContainer, alignment: .center)
-        install(rightStack, in: rightContainer, alignment: .right)
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(contentSizeDidChange(_:)),
+            name: .mmtmrTouchBarContentSizeDidChange,
+            object: nil
+        )
     }
 
     convenience init() {
@@ -49,111 +284,60 @@ private final class TouchBarZonesView: NSView {
         fatalError("init(coder:) has not been implemented")
     }
 
+    deinit {
+        NotificationCenter.default.removeObserver(self)
+    }
+
+    override func viewDidMoveToSuperview() {
+        super.viewDidMoveToSuperview()
+        needsLayout = true
+    }
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        needsLayout = true
+    }
+
     override func layout() {
         super.layout()
-        leftContainer.frame = TouchBarPhysicalLayout.frame(
-            for: .left,
-            containerWidth: bounds.width,
-            containerHeight: bounds.height
+        let actualBounds = TouchBarPhysicalLayout.visibleBounds(bounds: bounds, visibleRect: visibleRect)
+        let frames = TouchBarPhysicalLayout.frames(
+            in: actualBounds,
+            naturalWidths: TouchBarZoneWidths(
+                left: leftZone.naturalWidth,
+                center: centerZone.naturalWidth,
+                right: rightZone.naturalWidth
+            )
         )
-        centerContainer.frame = TouchBarPhysicalLayout.frame(
-            for: .center,
-            containerWidth: bounds.width,
-            containerHeight: bounds.height
-        )
-        rightContainer.frame = TouchBarPhysicalLayout.frame(
-            for: .right,
-            containerWidth: bounds.width,
-            containerHeight: bounds.height
-        )
+        apply(frame: frames.left, to: leftZone)
+        apply(frame: frames.center, to: centerZone)
+        apply(frame: frames.right, to: rightZone)
     }
 
     func update(left: [NSView], center: [NSView], right: [NSView]) {
-        replaceArrangedSubviews(of: leftStack, with: left)
-        replaceArrangedSubviews(of: centerStack, with: center)
-        replaceArrangedSubviews(of: rightStack, with: right)
+        // Detach every old item before adding any new one. This matters when an
+        // item moves between alignments: removing the old center after adding
+        // it to the left would otherwise detach it from its new parent.
+        leftZone.update(views: [])
+        centerZone.update(views: [])
+        rightZone.update(views: [])
+        leftZone.update(views: left)
+        centerZone.update(views: center)
+        rightZone.update(views: right)
         needsLayout = true
         layoutSubtreeIfNeeded()
     }
 
-    private enum ZoneAlignment {
-        case left
-        case center
-        case right
+    @objc private func contentSizeDidChange(_: Notification) {
+        needsLayout = true
+        superview?.needsLayout = true
     }
 
-    private static func makeStack() -> NSStackView {
-        let stack = NSStackView()
-        stack.orientation = .horizontal
-        stack.alignment = .centerY
-        stack.distribution = .fill
-        stack.spacing = 2
-        stack.translatesAutoresizingMaskIntoConstraints = false
-        // Without an explicit horizontal hugging priority AppKit may stretch an
-        // intrinsic center stack to the full zone width. Its arranged views are
-        // then laid out from that stretched stack's leading edge, so `center`
-        // visually behaves like the left edge of the middle third.
-        stack.setContentHuggingPriority(.required, for: .horizontal)
-        return stack
-    }
-
-    private func install(_ stack: NSStackView, in container: NSView, alignment: ZoneAlignment) {
-        container.addSubview(stack)
-        let fillWidth = stack.widthAnchor.constraint(equalTo: container.widthAnchor)
-        fillWidthConstraints[ObjectIdentifier(stack)] = fillWidth
-        var constraints = [
-            stack.centerYAnchor.constraint(equalTo: container.centerYAnchor),
-            stack.widthAnchor.constraint(lessThanOrEqualTo: container.widthAnchor),
-            stack.heightAnchor.constraint(lessThanOrEqualTo: container.heightAnchor),
-        ]
-        switch alignment {
-        case .left:
-            constraints.append(stack.leadingAnchor.constraint(equalTo: container.leadingAnchor))
-        case .center:
-            constraints.append(stack.centerXAnchor.constraint(equalTo: container.centerXAnchor))
-        case .right:
-            constraints.append(stack.trailingAnchor.constraint(equalTo: container.trailingAnchor))
-        }
-        NSLayoutConstraint.activate(constraints)
-    }
-
-    private func replaceArrangedSubviews(of stack: NSStackView, with views: [NSView]) {
-        let fillWidthConstraint = fillWidthConstraints[ObjectIdentifier(stack)]
-        fillWidthConstraint?.isActive = false
-        for view in stack.arrangedSubviews {
-            stack.removeArrangedSubview(view)
-            view.removeFromSuperview()
-        }
-        let unboundedScrollViews = views.compactMap { view -> NSScrollView? in
-            guard let scrollView = view as? NSScrollView else { return nil }
-            let hasWidth = scrollView.constraints.contains { constraint in
-                constraint.isActive
-                    && constraint.relation == .equal
-                    && constraint.firstItem === scrollView
-                    && constraint.firstAttribute == .width
-            }
-            return hasWidth ? nil : scrollView
-        }
-        let fillsAvailableWidth = !unboundedScrollViews.isEmpty
-        stack.setContentHuggingPriority(fillsAvailableWidth ? .defaultLow : .required, for: .horizontal)
-        for view in views {
-            if let scrollView = view as? NSScrollView {
-                // A scrollable widget may shrink when its natural width is wider
-                // than its physical third, but it must not stretch the whole
-                // stack. Stretching the stack moves a centered group to the
-                // leading edge of the center zone.
-                scrollView.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
-                scrollView.setContentHuggingPriority(
-                    unboundedScrollViews.contains { $0 === scrollView } ? .defaultLow : .defaultHigh,
-                    for: .horizontal
-                )
-            }
-            stack.addArrangedSubview(view)
-        }
-        // Preserve the historical fill behaviour only for scroll widgets that
-        // deliberately have no width. Center scroll areas and auto-sized Docks
-        // carry a natural-width constraint and therefore hug their content.
-        fillWidthConstraint?.isActive = fillsAvailableWidth
+    private func apply(frame: CGRect, to zone: TouchBarZoneScrollView) {
+        zone.isHidden = !zone.hasItems || frame.width <= 0.5
+        zone.frame = frame
+        zone.needsLayout = true
+        zone.layoutSubtreeIfNeeded()
     }
 }
 

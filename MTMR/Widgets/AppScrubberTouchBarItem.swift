@@ -60,7 +60,20 @@ class AppScrubberTouchBarItem: NSCustomTouchBarItem {
     }
     
     func updateSize() {
-        if self.autoResize {
+        let hasManualWidth = scrollView.constraints.contains { constraint in
+            constraint.isActive
+                && constraint !== widthConstraint
+                && constraint.priority == .required
+                && constraint.relation == .equal
+                && constraint.secondItem == nil
+                && constraint.firstItem === scrollView
+                && constraint.firstAttribute == .width
+        }
+        // With no explicit `width`, the Dock must always track the number of
+        // applications. `autoResize: false` only remains meaningful together
+        // with a manual width; otherwise it used to collapse into an arbitrary
+        // zone and show only a few icons.
+        if self.autoResize || !hasManualWidth {
             self.widthConstraint?.isActive = false
             
             let width = self.scrollView.documentView?.fittingSize.width ?? 0
@@ -70,6 +83,7 @@ class AppScrubberTouchBarItem: NSCustomTouchBarItem {
             self.widthConstraint!.priority = .defaultHigh
             self.widthConstraint!.isActive = true
         }
+        NotificationCenter.default.post(name: .mmtmrTouchBarContentSizeDidChange, object: self)
     }
     
     func reloadData() {

@@ -1,6 +1,7 @@
 import { Fragment } from "preact";
-import { useEffect, useRef, useState } from "preact/hooks";
+import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
 import { createItem, itemLabel, itemPresentation } from "../model";
+import { computeTouchBarZoneFrames, type TouchBarZoneFrames } from "../touchBarLayout";
 import type {
   Alignment,
   ConfigDocument,
@@ -30,6 +31,11 @@ interface DropIndicatorTarget {
   beforeID?: string;
   draggedItemID?: string;
   previewWidth: number;
+}
+
+interface ZoneOverflow {
+  leading: boolean;
+  trailing: boolean;
 }
 
 const DEFAULT_DROP_PREVIEW_WIDTH = 64;
@@ -174,8 +180,20 @@ function PreviewItem({
 export function TouchBarPreview(props: TouchBarPreviewProps) {
   const fitRef = useRef<HTMLDivElement>(null);
   const trackRef = useRef<HTMLDivElement>(null);
+  const zoneRefs = useRef<Partial<Record<Alignment, HTMLDivElement>>>({});
   const [scale, setScale] = useState(1);
   const [dropTarget, setDropTarget] = useState<DropIndicatorTarget>();
+  const [zoneFrames, setZoneFrames] = useState<TouchBarZoneFrames>();
+  const [zoneOverflow, setZoneOverflow] = useState<Record<Alignment, ZoneOverflow>>({
+    left: { leading: false, trailing: false },
+    center: { leading: false, trailing: false },
+    right: { leading: false, trailing: false },
+  });
+  const scrollMemory = useRef<Record<Alignment, { initialized: boolean; maximum: number }>>({
+    left: { initialized: false, maximum: 0 },
+    center: { initialized: false, maximum: 0 },
+    right: { initialized: false, maximum: 0 },
+  });
   const dropTargetRef = useRef<DropIndicatorTarget>();
   const updateDropTarget = (target?: DropIndicatorTarget) => {
     const current = dropTargetRef.current;
@@ -215,6 +233,13 @@ export function TouchBarPreview(props: TouchBarPreviewProps) {
       kind: typeof record.kind === "string" ? record.kind : undefined,
     });
   });
+  const byAlignment = (align: Alignment) => props.document.items
+    .filter((item) => geometries.get(item.id)?.visible !== false && (geometries.get(item.id)?.align ?? item.align ?? "left") === align)
+    .sort((left, right) => {
+      const leftX = geometries.get(left.id)?.x;
+      const rightX = geometries.get(right.id)?.x;
+      return typeof leftX === "number" && typeof rightX === "number" ? leftX - rightX : 0;
+    });
 
   useEffect(() => {
     const fit = fitRef.current;
@@ -244,13 +269,106 @@ export function TouchBarPreview(props: TouchBarPreviewProps) {
       window.removeEventListener("drop", clear);
     };
   }, []);
-  const byAlignment = (align: Alignment) => props.document.items
-    .filter((item) => geometries.get(item.id)?.visible !== false && (geometries.get(item.id)?.align ?? item.align ?? "left") === align)
-    .sort((left, right) => {
-      const leftX = geometries.get(left.id)?.x;
-      const rightX = geometries.get(right.id)?.x;
-      return typeof leftX === "number" && typeof rightX === "number" ? leftX - rightX : 0;
+
+  useLayoutEffect(() => {
+    const track = trackRef.current;
+    if (!track) return;
+    const measure = () => {
+      const trackWidth = track.clientWidth || track.getBoundingClientRect().width / Math.max(scale, 0.001);
+      if (!(trackWidth > 0)) return;
+      const naturalWidth = (align: Alignment) => {
+        const zone = zoneRefs.current[align];
+        if (!zone) return 0;
+        const children = Array.from(zone.children).filter((child): child is HTMLElement => (
+          child instanceof HTMLElement
+          && (child.classList.contains("touch-item") || child.classList.contains("drop-preview-slot"))
+        ));
+        if (children.length === 0) return 0;
+        const gap = Number.parseFloat(getComputedStyle(zone).columnGap || getComputedStyle(zone).gap) || 0;
+        return children.reduce((total, child) => {
+          const renderedWidth = child.offsetWidth || child.getBoundingClientRect().width / Math.max(scale, 0.001);
+          return total + Math.max(0, renderedWidth);
+        }, gap * Math.max(0, children.length - 1));
+      };
+      const next = computeTouchBarZoneFrames(trackWidth, {
+        left: naturalWidth("left"),
+        center: naturalWidth("center"),
+        right: naturalWidth("right"),
+      });
+      setZoneFrames((current) => {
+        const unchanged = current && (["left", "center", "right"] as Alignment[]).every((align) => (
+          Math.abs(current[align].x - next[align].x) < 0.25
+          && Math.abs(current[align].width - next[align].width) < 0.25
+        ));
+        return unchanged ? current : next;
+      });
+    };
+    measure();
+    const observer = typeof ResizeObserver === "undefined" ? undefined : new ResizeObserver(measure);
+    observer?.observe(track);
+    (["left", "center", "right"] as Alignment[]).forEach((align) => {
+      const zone = zoneRefs.current[align];
+      if (zone) observer?.observe(zone);
     });
+    return () => observer?.disconnect();
+  }, [props.document, props.runtimeSnapshot, dropTarget, scale]);
+
+  const refreshZoneOverflow = () => {
+    const next = {} as Record<Alignment, ZoneOverflow>;
+    (["left", "center", "right"] as Alignment[]).forEach((align) => {
+      const zone = zoneRefs.current[align];
+      const maximum = zone ? Math.max(0, zone.scrollWidth - zone.clientWidth) : 0;
+      const offset = zone?.scrollLeft ?? 0;
+      next[align] = {
+        leading: offset > 1,
+        trailing: offset < maximum - 1,
+      };
+      scrollMemory.current[align].maximum = maximum;
+    });
+    setZoneOverflow((current) => (["left", "center", "right"] as Alignment[]).every((align) => (
+      current[align].leading === next[align].leading
+      && current[align].trailing === next[align].trailing
+    )) ? current : next);
+  };
+
+  useLayoutEffect(() => {
+    if (!zoneFrames) return;
+    (["left", "center", "right"] as Alignment[]).forEach((align) => {
+      const zone = zoneRefs.current[align];
+      if (!zone) return;
+      const memory = scrollMemory.current[align];
+      const previousMaximum = memory.maximum;
+      const wasAtTrailingEdge = previousMaximum > 0 && zone.scrollLeft >= previousMaximum - 1;
+      const maximum = Math.max(0, zone.scrollWidth - zone.clientWidth);
+      if (!memory.initialized) {
+        if (align === "right") zone.scrollLeft = maximum;
+        else if (align === "center") zone.scrollLeft = maximum / 2;
+        else zone.scrollLeft = 0;
+        memory.initialized = true;
+      } else if (align === "right" && (wasAtTrailingEdge || previousMaximum === 0)) {
+        zone.scrollLeft = maximum;
+      } else {
+        zone.scrollLeft = Math.min(zone.scrollLeft, maximum);
+      }
+      memory.maximum = maximum;
+    });
+    refreshZoneOverflow();
+  }, [zoneFrames, props.document, dropTarget]);
+
+  const zoneStyle = (align: Alignment) => {
+    const frame = zoneFrames?.[align];
+    if (!frame) return undefined;
+    const isEmptyTarget = byAlignment(align).length === 0 && dropTarget?.align !== align;
+    if (!isEmptyTarget || frame.width > 0) {
+      return { left: `${frame.x}px`, width: `${frame.width}px` };
+    }
+    const placeholderWidth = 66;
+    const trackWidth = trackRef.current?.clientWidth ?? 0;
+    const x = align === "left" ? 0 : align === "right"
+      ? Math.max(0, trackWidth - placeholderWidth)
+      : Math.max(0, trackWidth / 2 - placeholderWidth / 2);
+    return { left: `${x}px`, width: `${placeholderWidth}px` };
+  };
   const dropPreviewWidth = (payload: ReturnType<typeof getDragPayload>): number => {
     if (payload?.kind === "item") {
       if (typeof payload.width === "number") return payload.width;
@@ -310,15 +428,18 @@ export function TouchBarPreview(props: TouchBarPreviewProps) {
               {(["left", "center", "right"] as Alignment[]).map((align) => {
                 const zoneItems = byAlignment(align);
                 const active = dropTarget?.align === align;
-                const items = active && dropTarget?.draggedItemID
+                const items = dropTarget?.draggedItemID
                   ? zoneItems.filter((item) => item.id !== dropTarget.draggedItemID)
                   : zoneItems;
                 return (
                   <div
-                    class={`drop-zone drop-zone-${align} ${active ? "drag-over" : ""}`}
+                    class={`drop-zone drop-zone-${align} ${active ? "drag-over" : ""} ${zoneOverflow[align].leading ? "overflow-leading" : ""} ${zoneOverflow[align].trailing ? "overflow-trailing" : ""}`}
                     data-testid={`drop-${align}`}
                     data-align={align}
                     key={align}
+                    ref={(element) => { zoneRefs.current[align] = element ?? undefined; }}
+                    style={zoneStyle(align)}
+                    onScroll={refreshZoneOverflow}
                     onDragOver={(event) => {
                       if (props.editingLocked) return;
                       event.preventDefault();

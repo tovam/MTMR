@@ -88,18 +88,26 @@ h3 { margin: 2px 0 0; font-size: 14px; }
 .touchbar-frame { width: 100%; height: 58px; position: relative; overflow: hidden; border: 1px solid #2c3035; border-radius: 10px; background: var(--touchbar); }
 .touchbar-fit { position: absolute; inset: 6px 8px; min-width: 0; display: flex; align-items: center; overflow: hidden; }
 .touchbar-track {
-  flex: none; min-width: 100%; width: 100%; height: 44px; display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 6px; transform-origin: left center;
+  flex: none; min-width: 100%; width: 100%; height: 44px; position: relative;
+  transform-origin: left center;
 }
-.drop-zone { min-width: 0; height: 44px; position: relative; display: flex; align-items: center; gap: 4px; overflow: hidden; border-radius: 6px; border: 1px dashed transparent; }
-.drop-zone-left { justify-content: flex-start; }
-.drop-zone-center { justify-content: center; }
-.drop-zone-right { justify-content: flex-end; }
-.drop-zone.drag-over { border-color: rgba(255, 59, 48, .48); background: rgba(255, 59, 48, .07); }
+.drop-zone {
+  min-width: 0; width: max-content; height: 44px; position: absolute; top: 0; display: flex; align-items: center;
+  gap: 2px; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; overscroll-behavior-x: contain;
+  border-radius: 6px;
+}
+.drop-zone::-webkit-scrollbar { display: none; }
+.drop-zone-left { left: 0; justify-content: flex-start; }
+.drop-zone-center { left: 50%; justify-content: center; transform: translateX(-50%); }
+.drop-zone-right { right: 0; justify-content: flex-end; }
+.drop-zone[style] { right: auto; transform: none; }
+.drop-zone.overflow-leading { -webkit-mask-image: linear-gradient(to right, transparent, #000 8%, #000 100%); mask-image: linear-gradient(to right, transparent, #000 8%, #000 100%); }
+.drop-zone.overflow-trailing { -webkit-mask-image: linear-gradient(to right, #000 0%, #000 92%, transparent); mask-image: linear-gradient(to right, #000 0%, #000 92%, transparent); }
+.drop-zone.overflow-leading.overflow-trailing { -webkit-mask-image: linear-gradient(to right, transparent, #000 8%, #000 92%, transparent); mask-image: linear-gradient(to right, transparent, #000 8%, #000 92%, transparent); }
+.drop-zone.drag-over { background: rgba(255, 59, 48, .07); box-shadow: inset 0 0 0 1px rgba(255, 59, 48, .48); }
 .drop-placeholder { min-width: 66px; text-align: center; color: #777e85; font: 9px var(--font-mono); text-transform: uppercase; border: 1px dashed #454a50; border-radius: 4px; padding: 7px 8px; }
 .touch-item {
-  min-width: 18px; max-width: none; height: 34px; padding: 0 9px; overflow: hidden; white-space: nowrap;
+  flex: 0 0 auto; min-width: 18px; max-width: none; height: 34px; padding: 0 9px; overflow: hidden; white-space: nowrap;
   position: relative;
   border-radius: 5px; border: 1px solid #50565d; background: var(--touch-item); color: #f4f5f6;
   cursor: grab; display: inline-flex; align-items: center; justify-content: center; gap: 5px;
