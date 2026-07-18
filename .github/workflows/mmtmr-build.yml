@@ -1,4 +1,4 @@
-name: MMTMR build and test
+name: MMTMR CI build and test
 
 on:
   workflow_dispatch:
