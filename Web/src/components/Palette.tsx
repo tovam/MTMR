@@ -2,7 +2,7 @@ import { useRef, useState } from "preact/hooks";
 import { schemaItemTypes } from "../model";
 import type { PaletteItemPresentation } from "../model";
 import type { JsonSchema } from "../types";
-import { BrightnessIcon, brightnessDirectionForType } from "./BrightnessIcon";
+import { ItemTypeIcon } from "./MediaControlIcon";
 
 export const DRAG_TYPE = "application/x-mmtmr-item";
 
@@ -61,8 +61,7 @@ interface PaletteProps {
 }
 
 function PaletteEntryIcon({ entry }: { entry: PaletteItemPresentation }) {
-  const direction = brightnessDirectionForType(entry.type);
-  return direction ? <BrightnessIcon direction={direction} /> : <>{entry.icon}</>;
+  return <ItemTypeIcon type={entry.type} fallback={entry.icon} />;
 }
 
 export function Palette({ schema, collapsed, editingLocked = false, onToggle, onAdd }: PaletteProps) {

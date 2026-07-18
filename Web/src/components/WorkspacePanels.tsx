@@ -1,5 +1,6 @@
+import type { ComponentChildren } from "preact";
 import { useEffect, useState } from "preact/hooks";
-import { itemEditorName } from "../model";
+import { flattenItems, itemEditorName } from "../model";
 import type {
   ConfigDocument,
   Diagnostic,
@@ -48,6 +49,38 @@ function FormPanel({
   onSelectItem,
   editingLocked,
 }: Pick<WorkspacePanelsProps, "document" | "diagnostics" | "onDocument" | "onSelectItem" | "editingLocked">) {
+  const flattenedItems = flattenItems(document.items);
+  const rows = (
+    items: ItemConfig[],
+    depth = 0,
+    prefix: number[] = [],
+  ): ComponentChildren => items.map((item, index) => {
+    const position = [...prefix, index + 1];
+    const children = Array.isArray(item.items) ? item.items : [];
+    return (
+      <div class="item-tree-entry" key={item.id}>
+        <button
+          type="button"
+          class={`item-row ${depth > 0 ? "is-nested" : ""}`}
+          role="row"
+          style={{ "--item-depth": depth }}
+          data-depth={depth}
+          onClick={() => onSelectItem(item.id)}
+          disabled={editingLocked}
+          title={`Inspecter ${itemEditorName(item)}`}
+        >
+          <span class="row-index">{position.map((part) => String(part).padStart(2, "0")).join(".")}</span>
+          <strong>{itemEditorName(item)}</strong>
+          <code>{item.type}</code>
+          <span>{item.align ?? "left"}</span>
+          <span class={item.enabled === false ? "status-disabled" : "status-enabled"}>
+            {item.enabled === false ? "désactivé" : "actif"}
+          </span>
+        </button>
+        {children.length > 0 && <div class="item-tree-children">{rows(children, depth + 1, position)}</div>}
+      </div>
+    );
+  });
   return (
     <div class="form-layout simplified-form">
       {editingLocked && (
@@ -60,7 +93,7 @@ function FormPanel({
           <div><span class="eyebrow">Document</span><h3>Configuration</h3></div>
           <div class="document-facts">
             <span>format v{document.formatVersion}</span>
-            <span>{document.items.length} élément{document.items.length > 1 ? "s" : ""}</span>
+            <span>{flattenedItems.length} élément{flattenedItems.length > 1 ? "s" : ""}</span>
           </div>
         </div>
         <label class="property-field document-notes">
@@ -83,25 +116,7 @@ function FormPanel({
           <span class="section-subtitle">Cliquez une ligne pour l’ouvrir dans l’inspecteur.</span>
         </div>
         <div class="item-table" role="table" aria-label="Éléments configurés">
-          {document.items.map((item, index) => (
-            <button
-              type="button"
-              class="item-row"
-              role="row"
-              key={item.id}
-              onClick={() => onSelectItem(item.id)}
-              disabled={editingLocked}
-              title={`Inspecter ${itemEditorName(item)}`}
-            >
-              <span class="row-index">{String(index + 1).padStart(2, "0")}</span>
-              <strong>{itemEditorName(item)}</strong>
-              <code>{item.type}</code>
-              <span>{item.align ?? "left"}</span>
-              <span class={item.enabled === false ? "status-disabled" : "status-enabled"}>
-                {item.enabled === false ? "désactivé" : "actif"}
-              </span>
-            </button>
-          ))}
+          {rows(document.items)}
           {document.items.length === 0 && <div class="empty-state compact">La barre est vide.</div>}
         </div>
       </section>

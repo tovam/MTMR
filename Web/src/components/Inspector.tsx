@@ -4,22 +4,30 @@ import {
   actionSchemaForType,
   defaultValueForSchema,
   itemEditorName,
+  itemPresentation,
   itemSchemaForType,
   propertyType,
   resolveReference,
   schemaActionTypes,
+  schemaItemTypes,
 } from "../model";
-import type { ActionConfig, Diagnostic, ItemConfig, JsonObject, JsonSchema, JsonValue } from "../types";
+import type { ActionConfig, Alignment, Diagnostic, ItemConfig, JsonObject, JsonSchema, JsonValue } from "../types";
+import { clearDragPayload, getDragPayload, setDragPayload } from "./Palette";
+import { ItemTypeIcon } from "./MediaControlIcon";
 
 interface InspectorProps {
   item?: ItemConfig;
   itemPath?: string;
+  ancestors?: ItemConfig[];
   schema?: JsonSchema;
   diagnostics?: Diagnostic[];
   editingLocked?: boolean;
   collapsed: boolean;
   onToggle(): void;
   onChange(item: ItemConfig): void;
+  onSelect(id: string): void;
+  onMoveToGroup(id: string, groupID: string, align?: Alignment, beforeID?: string): void;
+  onAddToGroup(type: string, groupID: string, align?: Alignment, beforeID?: string): void;
   onDuplicate(): void;
   onDelete(): void;
 }
@@ -431,6 +439,126 @@ function ActionsEditor({
   );
 }
 
+interface GroupDropTarget {
+  align: Alignment;
+  beforeID?: string;
+}
+
+function groupInsertionTarget(zone: HTMLDivElement, clientY: number, draggedItemID?: string): string | undefined {
+  const children = Array.from(zone.querySelectorAll<HTMLElement>(".group-child-card"))
+    .filter((child) => child.dataset.itemId !== draggedItemID);
+  for (const child of children) {
+    const bounds = child.getBoundingClientRect();
+    if (clientY < bounds.top + bounds.height / 2) return child.dataset.itemId;
+  }
+  return undefined;
+}
+
+function GroupItemsEditor({
+  group,
+  schema,
+  onSelect,
+  onMoveToGroup,
+  onAddToGroup,
+}: {
+  group: ItemConfig;
+  schema?: JsonSchema;
+  onSelect(id: string): void;
+  onMoveToGroup(id: string, groupID: string, align?: Alignment, beforeID?: string): void;
+  onAddToGroup(type: string, groupID: string, align?: Alignment, beforeID?: string): void;
+}) {
+  const items = Array.isArray(group.items) ? group.items : [];
+  const types = schemaItemTypes(schema);
+  const [dropTarget, setDropTarget] = useState<GroupDropTarget>();
+  const drop = (event: DragEvent, align: Alignment) => {
+    event.preventDefault();
+    event.stopPropagation();
+    const payload = getDragPayload(event);
+    const beforeID = dropTarget?.align === align ? dropTarget.beforeID : undefined;
+    setDropTarget(undefined);
+    clearDragPayload();
+    if (!payload) return;
+    if (payload.kind === "palette") onAddToGroup(payload.type, group.id, align, beforeID);
+    else if (payload.id !== group.id) onMoveToGroup(payload.id, group.id, align, beforeID);
+  };
+
+  return (
+    <div class="group-items-editor">
+      <div class="subheading-row group-editor-heading">
+        <span>Contenu du groupe <small>{items.length}</small></span>
+        <select
+          aria-label="Ajouter un composant au groupe"
+          value=""
+          onChange={(event) => {
+            const type = event.currentTarget.value;
+            if (type) onAddToGroup(type, group.id, "left");
+            event.currentTarget.value = "";
+          }}
+        >
+          <option value="">+ Ajouter…</option>
+          {types.map((entry) => <option value={entry.type} key={entry.type}>{entry.label}</option>)}
+        </select>
+      </div>
+      <p class="group-editor-hint">Glissez ici un composant de la palette ou un élément existant.</p>
+      <div class="group-lanes">
+        {(["left", "center", "right"] as Alignment[]).map((align) => {
+          const laneItems = items.filter((item) => (item.align ?? "left") === align);
+          const active = dropTarget?.align === align;
+          return (
+            <div
+              class={`group-lane ${active ? "drag-over" : ""}`}
+              data-testid={`group-drop-${align}`}
+              key={align}
+              onDragOver={(event) => {
+                const payload = getDragPayload(event);
+                if (payload?.kind === "item" && payload.id === group.id) return;
+                event.preventDefault();
+                event.stopPropagation();
+                if (event.dataTransfer) event.dataTransfer.dropEffect = payload?.kind === "palette" ? "copy" : "move";
+                setDropTarget({
+                  align,
+                  beforeID: groupInsertionTarget(event.currentTarget, event.clientY, payload?.kind === "item" ? payload.id : undefined),
+                });
+              }}
+              onDragLeave={(event) => {
+                const related = event.relatedTarget;
+                if (related instanceof Node && event.currentTarget.contains(related)) return;
+                setDropTarget((current) => current?.align === align ? undefined : current);
+              }}
+              onDrop={(event) => drop(event, align)}
+            >
+              <div class="group-lane-label">{align === "left" ? "Gauche" : align === "center" ? "Centre" : "Droite"}</div>
+              {laneItems.length === 0 && !active && <div class="group-lane-empty">Déposer ici</div>}
+              {laneItems.map((child) => {
+                const presentation = itemPresentation(child.type);
+                return (
+                  <div key={child.id}>
+                    {active && dropTarget?.beforeID === child.id && <div class="group-drop-indicator" />}
+                    <div
+                      class="group-child-card"
+                      data-item-id={child.id}
+                      draggable
+                      onDragStart={(event) => setDragPayload(event, { kind: "item", id: child.id })}
+                      onDragEnd={() => { clearDragPayload(); setDropTarget(undefined); }}
+                    >
+                      <button type="button" onClick={() => onSelect(child.id)} title={`Inspecter ${itemEditorName(child)}`}>
+                        <span class="group-child-icon" aria-hidden="true"><ItemTypeIcon type={child.type} fallback={presentation.icon} /></span>
+                        <span><strong>{itemEditorName(child)}</strong><small>{child.type}</small></span>
+                      </button>
+                      <span class="drag-handle" aria-hidden="true">⠿</span>
+                    </div>
+                  </div>
+                );
+              })}
+              {active && dropTarget?.beforeID === undefined && <div class="group-drop-indicator" />}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function AppleToggle({
   label,
   detail,
@@ -456,12 +584,16 @@ function AppleToggle({
 export function Inspector({
   item,
   itemPath,
+  ancestors = [],
   schema,
   diagnostics = [],
   editingLocked = false,
   collapsed,
   onToggle,
   onChange,
+  onSelect,
+  onMoveToGroup,
+  onAddToGroup,
   onDuplicate,
   onDelete,
 }: InspectorProps) {
@@ -494,6 +626,7 @@ export function Inspector({
     return Object.entries(properties)
       .filter(([name]) => {
         if (["actions", "enabled", "bordered"].includes(name)) return false;
+        if (item?.type === "group" && name === "items") return false;
         if (item?.type === "dock" && name === "autoResize") return false;
         if (item?.type === "dock" && item.autoResize !== false && name === "width") return false;
         return true;
@@ -519,6 +652,14 @@ export function Inspector({
           ) : (
             <fieldset class="inspector-fields" disabled={editingLocked}>
               {editingLocked && <div class="draft-lock-banner compact-lock">Brouillon JSON invalide : inspection en lecture seule.</div>}
+              {ancestors.length > 0 && (
+                <nav class="inspector-breadcrumbs" aria-label="Groupes parents">
+                  <span>Dans</span>
+                  {ancestors.map((ancestor) => (
+                    <button type="button" key={ancestor.id} onClick={() => onSelect(ancestor.id)}>{itemEditorName(ancestor)}</button>
+                  ))}
+                </nav>
+              )}
               <div class="inspector-title">
                 <div>
                   <span class="eyebrow">{item.type}</span>
@@ -557,6 +698,15 @@ export function Inspector({
                 )}
               </div>
               <InlineDiagnostics diagnostics={diagnosticsAtPath(diagnostics, itemPath, false)} />
+              {item.type === "group" && (
+                <GroupItemsEditor
+                  group={item}
+                  schema={schema}
+                  onSelect={onSelect}
+                  onMoveToGroup={onMoveToGroup}
+                  onAddToGroup={onAddToGroup}
+                />
+              )}
               <div class="property-list">
                 {orderedProperties.map(([name, propertySchema]) => (
                     <PropertyField

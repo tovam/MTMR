@@ -1,5 +1,17 @@
 import { useEffect, useState } from "preact/hooks";
-import { addItem, cloneDocument, createID, createItem, moveItem } from "./model";
+import {
+  addItem,
+  addItemToGroup,
+  createItem,
+  duplicateItem,
+  flattenItems,
+  itemAncestors,
+  itemPath,
+  moveItem,
+  moveItemToGroup,
+  removeItem,
+  updateItem,
+} from "./model";
 import type { Alignment, EditorTab, ItemConfig } from "./types";
 import { Inspector } from "./components/Inspector";
 import { Palette } from "./components/Palette";
@@ -67,25 +79,31 @@ export function App() {
     editor.select(id);
   };
 
+  const addToGroup = (type: string, groupID: string, align: Alignment = "left", beforeID?: string) => {
+    if (editor.formLocked) return;
+    const item = createItem(type, editor.schema);
+    editor.commitDocument(addItemToGroup(editor.document, item, groupID, align, beforeID), "group.item.added");
+    editor.select(item.id);
+    setInspectorCollapsed(false);
+  };
+
+  const moveToGroup = (id: string, groupID: string, align?: Alignment, beforeID?: string) => {
+    if (editor.formLocked) return;
+    editor.commitDocument(moveItemToGroup(editor.document, id, groupID, align, beforeID), "group.item.moved");
+    editor.select(id);
+    setInspectorCollapsed(false);
+  };
+
   const replaceSelected = (item: ItemConfig) => {
     if (editor.formLocked) return;
-    editor.updateDocument((draft) => {
-      const index = draft.items.findIndex((candidate) => candidate.id === item.id);
-      if (index >= 0) draft.items[index] = item;
-    }, "item.changed");
+    editor.commitDocument(updateItem(editor.document, item), "item.changed");
   };
 
   const duplicateSelected = () => {
     if (!editor.selectedItem || editor.formLocked) return;
-    const copy = cloneDocument({ formatVersion: 1, items: [editor.selectedItem] }).items[0];
-    copy.id = createID(copy.type);
-    if (typeof copy.editorName === "string" && copy.editorName) copy.editorName = `${copy.editorName} copie`;
-    if (typeof copy.title === "string" && copy.title) copy.title = `${copy.title} copie`;
-    const index = editor.document.items.findIndex((candidate) => candidate.id === editor.selectedItem?.id);
-    const document = cloneDocument(editor.document);
-    document.items.splice(index + 1, 0, copy);
-    editor.commitDocument(document, "item.duplicated");
-    editor.select(copy.id);
+    const result = duplicateItem(editor.document, editor.selectedItem.id);
+    editor.commitDocument(result.document, "item.duplicated");
+    editor.select(result.item?.id);
   };
 
   const selectFromList = (id: string) => {
@@ -95,11 +113,12 @@ export function App() {
 
   const deleteSelected = () => {
     if (!editor.selectedItem || editor.formLocked) return;
-    const index = editor.document.items.findIndex((candidate) => candidate.id === editor.selectedItem?.id);
-    const document = cloneDocument(editor.document);
-    document.items.splice(index, 1);
+    const orderedBefore = flattenItems(editor.document.items);
+    const index = orderedBefore.findIndex((candidate) => candidate.id === editor.selectedItem?.id);
+    const document = removeItem(editor.document, editor.selectedItem.id);
+    const orderedAfter = flattenItems(document.items);
     editor.commitDocument(document, "item.deleted");
-    editor.select(document.items[index]?.id ?? document.items[index - 1]?.id);
+    editor.select(orderedAfter[Math.min(Math.max(0, index), orderedAfter.length - 1)]?.id);
   };
 
   return (
@@ -140,6 +159,8 @@ export function App() {
         onSelect={editor.select}
         onMove={move}
         onAdd={add}
+        onMoveIntoGroup={moveToGroup}
+        onAddIntoGroup={addToGroup}
       />
 
       <div class="workspace">
@@ -177,13 +198,17 @@ export function App() {
 
         <Inspector
           item={editor.selectedItem}
-          itemPath={editor.selectedItem ? `$.items[${editor.document.items.findIndex((item) => item.id === editor.selectedItem?.id)}]` : undefined}
+          itemPath={itemPath(editor.document, editor.selectedID)}
+          ancestors={itemAncestors(editor.document, editor.selectedID)}
           schema={editor.schema}
           diagnostics={editor.diagnostics}
           editingLocked={editor.formLocked}
           collapsed={inspectorCollapsed}
           onToggle={() => setInspectorCollapsed((value) => !value)}
           onChange={replaceSelected}
+          onSelect={selectFromList}
+          onMoveToGroup={moveToGroup}
+          onAddToGroup={addToGroup}
           onDuplicate={duplicateSelected}
           onDelete={deleteSelected}
         />
@@ -192,7 +217,7 @@ export function App() {
       <div class="status-bar">
         <div><span class={`status-light status-${editor.saveState}`} />{saveStateLabel(editor.saveState)}</div>
         <div class="status-summary">
-          <span>{editor.document.items.length} élément{editor.document.items.length > 1 ? "s" : ""}</span>
+          <span>{flattenItems(editor.document.items).length} élément{flattenItems(editor.document.items).length > 1 ? "s" : ""}</span>
           <span>{editor.diagnostics.filter((entry) => entry.severity === "error").length} erreur{editor.diagnostics.filter((entry) => entry.severity === "error").length > 1 ? "s" : ""}</span>
           <span>MMTMR {editor.status.version}</span>
           <span>127.0.0.1:{editor.status.port}</span>

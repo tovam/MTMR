@@ -1,8 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
   addItem,
+  addItemToGroup,
   createItem,
+  duplicateItem,
   moveItem,
+  moveItemToGroup,
   parseSource,
   schemaItemTypes,
   stableSource,
@@ -34,6 +37,20 @@ describe("modèle de configuration", () => {
     expect(result.diagnostics.some((entry) => entry.message.includes("dupliqué"))).toBe(true);
   });
 
+  it("refuse aussi un identifiant dupliqué au fond d’un groupe", () => {
+    const result = parseSource(JSON.stringify({
+      formatVersion: 1,
+      items: [
+        { id: "same", type: "staticButton" },
+        { id: "group", type: "group", items: [{ id: "same", type: "play" }] },
+      ],
+    }));
+    expect(result.document).toBeUndefined();
+    expect(result.diagnostics).toContainEqual(expect.objectContaining({
+      path: "$.items[1].items[0].id",
+    }));
+  });
+
   it("déplace les éléments et met à jour leur alignement", () => {
     const document: ConfigDocument = {
       formatVersion: 1,
@@ -46,6 +63,44 @@ describe("modèle de configuration", () => {
     expect(result.items.map((item) => item.id)).toEqual(["a", "b"]);
     expect(result.items[0].align).toBe("right");
     expect(document.items[0].align).toBe("left");
+  });
+
+  it("ajoute et déplace réellement des éléments dans un groupe", () => {
+    const document: ConfigDocument = {
+      formatVersion: 1,
+      items: [
+        { id: "group", type: "group", align: "left", items: [] },
+        { id: "sound", type: "volumeUp", align: "right" },
+      ],
+    };
+    const added = addItemToGroup(document, { id: "light", type: "brightnessUp" }, "group", "center");
+    const moved = moveItemToGroup(added, "sound", "group", "right");
+    expect(moved.items.map((item) => item.id)).toEqual(["group"]);
+    expect(moved.items[0].items).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: "light", align: "center" }),
+      expect.objectContaining({ id: "sound", align: "right" }),
+    ]));
+
+    const extracted = moveItem(moved, "light", "left");
+    expect(extracted.items.map((item) => item.id)).toEqual(["group", "light"]);
+    expect(extracted.items[0].items).toEqual([expect.objectContaining({ id: "sound" })]);
+    expect(document.items[0].items).toEqual([]);
+  });
+
+  it("duplique un groupe avec de nouveaux identifiants pour tout le sous-arbre", () => {
+    const document: ConfigDocument = {
+      formatVersion: 1,
+      items: [{
+        id: "group",
+        type: "group",
+        items: [{ id: "child", type: "staticButton", title: "ž" }],
+      }],
+    };
+    const result = duplicateItem(document, "group");
+    expect(result.document.items).toHaveLength(2);
+    expect(result.item?.id).not.toBe("group");
+    expect(result.item?.items?.[0].id).not.toBe("child");
+    expect(document.items).toHaveLength(1);
   });
 
   it("crée un élément depuis les valeurs par défaut du schéma", () => {
@@ -72,6 +127,10 @@ describe("modèle de configuration", () => {
     expect(schemaItemTypes(schema)).toContainEqual(expect.objectContaining({ type: "testButton", label: "Bouton test", icon: "•" }));
     expect(item).not.toHaveProperty("editorName");
     expect(addItem({ formatVersion: 1, items: [] }, item, "center").items[0].align).toBe("center");
+  });
+
+  it("initialise un groupe vide prêt à recevoir des composants", () => {
+    expect(createItem("group")).toMatchObject({ type: "group", items: [] });
   });
 
   it("crée un Dock ajusté à ses icônes par défaut", () => {

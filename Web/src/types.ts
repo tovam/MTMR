@@ -21,6 +21,7 @@ export interface ItemConfig extends JsonObject {
   notes?: string;
   enabled?: boolean;
   actions?: ActionConfig[];
+  items?: ItemConfig[];
 }
 
 export interface ConfigDocument extends JsonObject {

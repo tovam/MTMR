@@ -4,6 +4,8 @@ import {
   EMPTY_DOCUMENT,
   cloneDocument,
   createID,
+  findItem,
+  flattenItems,
   isRecord,
   parseSource,
   stableSource,
@@ -164,7 +166,7 @@ export function useEditorState() {
       setHistory((current) => resetHistory
         ? { past: [], present: cloneDocument(document), future: [] }
         : { ...current, present: cloneDocument(document) });
-      setSelectedID((current) => document.items.some((item) => item.id === current) ? current : document.items[0]?.id);
+      setSelectedID((current) => findItem(document, current)?.id ?? flattenItems(document.items)[0]?.id);
     }
   }, []);
 
@@ -340,7 +342,7 @@ export function useEditorState() {
           future: [],
         };
       });
-      setSelectedID((current) => parsed.document!.items.some((item) => item.id === current) ? current : parsed.document!.items[0]?.id);
+      setSelectedID((current) => findItem(parsed.document!, current)?.id ?? flattenItems(parsed.document!.items)[0]?.id);
     }
   }, []);
 
@@ -460,7 +462,7 @@ export function useEditorState() {
   }, [appendEvent]);
 
   const simulateAction = useCallback(async (itemID: string | undefined, trigger = "singleTap") => {
-    const item = history.present.items.find((candidate) => candidate.id === itemID);
+    const item = findItem(history.present, itemID);
     const action = item?.actions?.find((candidate) => candidate.trigger === trigger) ?? item?.actions?.[0];
     try {
       const response = await api.simulateAction({ itemID, trigger, action });
@@ -471,7 +473,7 @@ export function useEditorState() {
       setSimulationResult(message);
       appendEvent("simulation.error", message);
     }
-  }, [appendEvent, history.present.items]);
+  }, [appendEvent, history.present]);
 
   const beginSimulation = useCallback(() => {
     setSimulationOverride((current) => current ?? runtimeContextRef.current);
@@ -485,8 +487,8 @@ export function useEditorState() {
   }, [appendEvent]);
 
   const selectedItem = useMemo(
-    () => history.present.items.find((item) => item.id === selectedID),
-    [history.present.items, selectedID],
+    () => findItem(history.present, selectedID),
+    [history.present, selectedID],
   );
   const formLocked = useMemo(
     () => !parseSource(rawSource).document,

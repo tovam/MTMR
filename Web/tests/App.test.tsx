@@ -22,19 +22,33 @@ const schema = {
     items: {
       type: "array",
       items: {
-        oneOf: [{
-          title: "Bouton statique",
-          type: "object",
-          properties: {
-            id: { type: "string", readOnly: true },
-            type: { const: "staticButton" },
-            title: { type: "string" },
-            align: { type: "string", enum: ["left", "center", "right"] },
-            enabled: { type: "boolean", default: true },
-            actions: { type: "array", items: { $ref: "#/$defs/action" } },
+        oneOf: [
+          {
+            title: "Bouton statique",
+            type: "object",
+            properties: {
+              id: { type: "string", readOnly: true },
+              type: { const: "staticButton" },
+              title: { type: "string" },
+              align: { type: "string", enum: ["left", "center", "right"] },
+              enabled: { type: "boolean", default: true },
+              actions: { type: "array", items: { $ref: "#/$defs/action" } },
+            },
+            required: ["id", "type"],
           },
-          required: ["id", "type"],
-        }],
+          {
+            title: "Groupe",
+            type: "object",
+            properties: {
+              id: { type: "string", readOnly: true },
+              type: { const: "group" },
+              align: { type: "string", enum: ["left", "center", "right"] },
+              enabled: { type: "boolean", default: true },
+              items: { type: "array", items: { $ref: "#/properties/items/items" } },
+            },
+            required: ["id", "type", "items"],
+          },
+        ],
       },
     },
   },
@@ -322,6 +336,46 @@ describe("éditeur MMTMR", () => {
       const saved = JSON.parse(source) as typeof orderedConfig;
       expect(saved.items.map((item) => item.id)).toEqual(["alpha", "hello", "omega"]);
       expect(saved.items.find((item) => item.id === "hello")?.align).toBe("center");
+    }, { timeout: 2_000 });
+  });
+
+  it("permet de déposer un élément directement dans un groupe", async () => {
+    const user = userEvent.setup();
+    const originalFetch = vi.mocked(fetch).getMockImplementation()!;
+    const groupedConfig = {
+      ...config,
+      items: [
+        { id: "system", type: "group", align: "left", enabled: true, items: [] },
+        config.items[0],
+      ],
+    };
+    vi.mocked(fetch).mockImplementation(async (input, init) => {
+      if (String(input).endsWith("/config") && init?.method !== "PUT") {
+        return jsonResponse({ source: `${JSON.stringify(groupedConfig, null, 2)}\n`, document: groupedConfig, revision: 4, diagnostics: [], valid: true });
+      }
+      return originalFetch(input, init);
+    });
+
+    render(<App />);
+    const child = await screen.findByRole("button", { name: "Bonjour" });
+    const preview = screen.getByLabelText("Aperçu de la Touch Bar");
+    const group = within(preview).getByRole("button", { name: "Groupe" });
+    fireEvent.dragStart(child);
+    fireEvent.dragOver(group);
+    expect(group).toHaveClass("group-drop-active");
+    fireEvent.drop(group);
+
+    await waitFor(() => expect(screen.queryByRole("button", { name: "Bonjour" })).not.toBeInTheDocument());
+    await user.click(within(preview).getByRole("button", { name: "Groupe" }));
+    expect(screen.getByText("Contenu du groupe")).toBeInTheDocument();
+    expect(within(screen.getByTestId("group-drop-left")).getByRole("button", { name: /Bonjour staticButton/ })).toBeInTheDocument();
+    expect(screen.getByRole("row", { name: /Bonjour staticButton left actif/ })).toHaveAttribute("data-depth", "1");
+    await waitFor(() => {
+      const put = vi.mocked(fetch).mock.calls.find(([, init]) => init?.method === "PUT");
+      const source = JSON.parse(String(put?.[1]?.body)).source as string;
+      const saved = JSON.parse(source) as { items: Array<{ id: string; items?: Array<{ id: string }> }> };
+      expect(saved.items.map((item) => item.id)).toEqual(["system"]);
+      expect(saved.items[0].items).toEqual([expect.objectContaining({ id: "hello" })]);
     }, { timeout: 2_000 });
   });
 

@@ -124,8 +124,8 @@ export function validateDocumentShape(value: unknown): Diagnostic[] {
     return diagnostics;
   }
   const ids = new Set<string>();
-  value.items.forEach((candidate, index) => {
-    const path = `$.items[${index}]`;
+  const validateItems = (items: unknown[], itemsPath: string) => items.forEach((candidate, index) => {
+    const path = `${itemsPath}[${index}]`;
     if (!isRecord(candidate)) {
       diagnostics.push({ severity: "error", message: "L’élément doit être un objet.", path });
       return;
@@ -146,7 +146,12 @@ export function validateDocumentShape(value: unknown): Diagnostic[] {
     if (candidate.actions !== undefined && !Array.isArray(candidate.actions)) {
       diagnostics.push({ severity: "error", message: "actions doit être un tableau.", path: `${path}.actions` });
     }
+    if (candidate.items !== undefined) {
+      if (Array.isArray(candidate.items)) validateItems(candidate.items, `${path}.items`);
+      else diagnostics.push({ severity: "error", message: "items doit être un tableau.", path: `${path}.items` });
+    }
   });
+  validateItems(value.items, "$.items");
   return diagnostics;
 }
 
@@ -169,6 +174,7 @@ export function createItem(type: string, schema?: JsonSchema): ItemConfig {
     }
   }
   if (type === "staticButton" && item.title === undefined) item.title = "Nouveau";
+  if (type === "group" && item.items === undefined) item.items = [];
   if (item.editorName === undefined && typeSchema?.properties?.editorName !== undefined) {
     item.editorName = FALLBACK_ITEM_TYPES.find((entry) => entry.type === type)?.label ?? type;
   }
@@ -196,6 +202,106 @@ export function itemPresentation(type: string): PaletteItemPresentation {
   };
 }
 
+export interface ItemTreeLocation {
+  item: ItemConfig;
+  parent?: ItemConfig;
+  index: number;
+  indices: number[];
+}
+
+function childItems(item: ItemConfig): ItemConfig[] {
+  return Array.isArray(item.items) ? item.items : [];
+}
+
+function findInItems(
+  items: ItemConfig[],
+  itemID: string,
+  parent: ItemConfig | undefined,
+  indices: number[],
+): ItemTreeLocation | undefined {
+  for (let index = 0; index < items.length; index += 1) {
+    const item = items[index];
+    const nextIndices = [...indices, index];
+    if (item.id === itemID) return { item, parent, index, indices: nextIndices };
+    const nested = findInItems(childItems(item), itemID, item, nextIndices);
+    if (nested) return nested;
+  }
+  return undefined;
+}
+
+export function findItemLocation(document: ConfigDocument, itemID: string | undefined): ItemTreeLocation | undefined {
+  return itemID ? findInItems(document.items, itemID, undefined, []) : undefined;
+}
+
+export function findItem(document: ConfigDocument, itemID: string | undefined): ItemConfig | undefined {
+  return findItemLocation(document, itemID)?.item;
+}
+
+export function itemPath(document: ConfigDocument, itemID: string | undefined): string | undefined {
+  const location = findItemLocation(document, itemID);
+  if (!location) return undefined;
+  return location.indices.reduce(
+    (path, index, depth) => `${path}${depth === 0 ? "" : ".items"}[${index}]`,
+    "$.items",
+  );
+}
+
+export function itemAncestors(document: ConfigDocument, itemID: string | undefined): ItemConfig[] {
+  const location = findItemLocation(document, itemID);
+  if (!location || location.indices.length < 2) return [];
+  const ancestors: ItemConfig[] = [];
+  let items = document.items;
+  for (const index of location.indices.slice(0, -1)) {
+    const item = items[index];
+    if (!item) break;
+    ancestors.push(item);
+    items = childItems(item);
+  }
+  return ancestors;
+}
+
+export function flattenItems(items: ItemConfig[]): ItemConfig[] {
+  return items.flatMap((item) => [item, ...flattenItems(childItems(item))]);
+}
+
+function mutableLocation(
+  items: ItemConfig[],
+  itemID: string,
+): { item: ItemConfig; collection: ItemConfig[]; index: number } | undefined {
+  for (let index = 0; index < items.length; index += 1) {
+    const item = items[index];
+    if (item.id === itemID) return { item, collection: items, index };
+    const nested = mutableLocation(childItems(item), itemID);
+    if (nested) return nested;
+  }
+  return undefined;
+}
+
+function insertAligned(
+  collection: ItemConfig[],
+  item: ItemConfig,
+  align: Alignment,
+  beforeID?: string,
+) {
+  item.align = align;
+  if (beforeID) {
+    const target = collection.findIndex((candidate) => candidate.id === beforeID);
+    if (target >= 0) {
+      collection.splice(target, 0, item);
+      return;
+    }
+  }
+  const lastInZone = collection.reduce(
+    (last, candidate, index) => ((candidate.align ?? "left") === align ? index : last),
+    -1,
+  );
+  collection.splice(lastInZone + 1, 0, item);
+}
+
+function containsItem(item: ItemConfig, itemID: string): boolean {
+  return item.id === itemID || childItems(item).some((child) => containsItem(child, itemID));
+}
+
 export function moveItem(
   document: ConfigDocument,
   itemID: string,
@@ -204,22 +310,10 @@ export function moveItem(
 ): ConfigDocument {
   const next = cloneDocument(document);
   if (itemID === beforeID) return next;
-  const from = next.items.findIndex((item) => item.id === itemID);
-  if (from < 0) return next;
-  const [item] = next.items.splice(from, 1);
-  item.align = align;
-  if (beforeID) {
-    const target = next.items.findIndex((candidate) => candidate.id === beforeID);
-    if (target >= 0) {
-      next.items.splice(target, 0, item);
-      return next;
-    }
-  }
-  const lastInZone = next.items.reduce(
-    (last, candidate, index) => ((candidate.align ?? "left") === align ? index : last),
-    -1,
-  );
-  next.items.splice(lastInZone + 1, 0, item);
+  const source = mutableLocation(next.items, itemID);
+  if (!source) return next;
+  const [item] = source.collection.splice(source.index, 1);
+  insertAligned(next.items, item, align, beforeID);
   return next;
 }
 
@@ -230,20 +324,78 @@ export function addItem(
   beforeID?: string,
 ): ConfigDocument {
   const next = cloneDocument(document);
-  item.align = align;
-  if (beforeID) {
-    const target = next.items.findIndex((candidate) => candidate.id === beforeID);
-    if (target >= 0) {
-      next.items.splice(target, 0, item);
-      return next;
-    }
-  }
-  const lastInZone = next.items.reduce(
-    (last, candidate, index) => ((candidate.align ?? "left") === align ? index : last),
-    -1,
-  );
-  next.items.splice(lastInZone + 1, 0, item);
+  insertAligned(next.items, structuredClone(item), align, beforeID);
   return next;
+}
+
+export function addItemToGroup(
+  document: ConfigDocument,
+  item: ItemConfig,
+  groupID: string,
+  align: Alignment = "left",
+  beforeID?: string,
+): ConfigDocument {
+  const next = cloneDocument(document);
+  const target = mutableLocation(next.items, groupID)?.item;
+  if (!target || target.type !== "group") return next;
+  if (!Array.isArray(target.items)) target.items = [];
+  insertAligned(target.items, structuredClone(item), align, beforeID);
+  return next;
+}
+
+export function moveItemToGroup(
+  document: ConfigDocument,
+  itemID: string,
+  groupID: string,
+  align?: Alignment,
+  beforeID?: string,
+): ConfigDocument {
+  const next = cloneDocument(document);
+  if (itemID === groupID || itemID === beforeID) return next;
+  const source = mutableLocation(next.items, itemID);
+  if (!source || containsItem(source.item, groupID)) return next;
+  const preservedAlign = source.item.align ?? "left";
+  const [item] = source.collection.splice(source.index, 1);
+  const target = mutableLocation(next.items, groupID)?.item;
+  if (!target || target.type !== "group") return cloneDocument(document);
+  if (!Array.isArray(target.items)) target.items = [];
+  insertAligned(target.items, item, align ?? preservedAlign, beforeID);
+  return next;
+}
+
+export function updateItem(document: ConfigDocument, replacement: ItemConfig): ConfigDocument {
+  const next = cloneDocument(document);
+  const location = mutableLocation(next.items, replacement.id);
+  if (location) location.collection[location.index] = structuredClone(replacement);
+  return next;
+}
+
+export function removeItem(document: ConfigDocument, itemID: string): ConfigDocument {
+  const next = cloneDocument(document);
+  const location = mutableLocation(next.items, itemID);
+  if (location) location.collection.splice(location.index, 1);
+  return next;
+}
+
+function cloneItemWithFreshIDs(item: ItemConfig): ItemConfig {
+  const copy = structuredClone(item);
+  copy.id = createID(copy.type);
+  if (typeof copy.editorName === "string" && copy.editorName) copy.editorName = `${copy.editorName} copie`;
+  if (typeof copy.title === "string" && copy.title) copy.title = `${copy.title} copie`;
+  if (Array.isArray(copy.items)) copy.items = copy.items.map(cloneItemWithFreshIDs);
+  return copy;
+}
+
+export function duplicateItem(
+  document: ConfigDocument,
+  itemID: string,
+): { document: ConfigDocument; item?: ItemConfig } {
+  const next = cloneDocument(document);
+  const location = mutableLocation(next.items, itemID);
+  if (!location) return { document: next };
+  const copy = cloneItemWithFreshIDs(location.item);
+  location.collection.splice(location.index + 1, 0, copy);
+  return { document: next, item: copy };
 }
 
 export function resolveReference(root: JsonSchema | undefined, schema: JsonSchema | undefined): JsonSchema | undefined {

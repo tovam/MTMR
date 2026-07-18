@@ -12,7 +12,7 @@ import type {
   SimulationContext,
 } from "../types";
 import { clearDragPayload, getDragPayload, setDragPayload } from "./Palette";
-import { BrightnessIcon, brightnessDirectionForType } from "./BrightnessIcon";
+import { ItemTypeIcon } from "./MediaControlIcon";
 
 interface TouchBarPreviewProps {
   document: ConfigDocument;
@@ -24,6 +24,8 @@ interface TouchBarPreviewProps {
   onSelect(id: string): void;
   onMove(id: string, align: Alignment, beforeID?: string): void;
   onAdd(item: ItemConfig, align: Alignment, beforeID?: string): void;
+  onMoveIntoGroup(id: string, groupID: string): void;
+  onAddIntoGroup(type: string, groupID: string): void;
 }
 
 interface DropIndicatorTarget {
@@ -104,6 +106,8 @@ function PreviewItem({
   simulation,
   geometry,
   onSelect,
+  onMoveIntoGroup,
+  onAddIntoGroup,
   editingLocked,
   previewScale,
 }: {
@@ -112,12 +116,14 @@ function PreviewItem({
   simulation: SimulationContext;
   geometry?: RuntimeItemGeometry;
   onSelect(id: string): void;
+  onMoveIntoGroup(id: string, groupID: string): void;
+  onAddIntoGroup(type: string, groupID: string): void;
   editingLocked: boolean;
   previewScale: number;
 }) {
+  const [groupDropActive, setGroupDropActive] = useState(false);
   const kind = geometry?.kind ?? item.type;
   const presentation = itemPresentation(kind);
-  const brightnessDirection = brightnessDirectionForType(kind);
   const fallbackTitle = displayTitle(item, simulation);
   const displayedTitle = typeof geometry?.title === "string" ? geometry.title : fallbackTitle;
   const renderedImage = typeof geometry?.renderedImage === "string" && geometry.renderedImage.startsWith("data:image/")
@@ -136,7 +142,7 @@ function PreviewItem({
   };
   return (
     <button
-      class={`touch-item ${renderedImage ? "has-native-render" : ""} ${selected ? "is-selected" : ""} ${item.enabled === false ? "is-disabled" : ""}`}
+      class={`touch-item ${renderedImage ? "has-native-render" : ""} ${selected ? "is-selected" : ""} ${item.enabled === false ? "is-disabled" : ""} ${groupDropActive ? "group-drop-active" : ""}`}
       style={sizeStyle}
       data-kind={kind}
       data-item-id={item.id}
@@ -155,6 +161,32 @@ function PreviewItem({
         });
       }}
       onDragEnd={clearDragPayload}
+      onDragOver={(event) => {
+        if (editingLocked || kind !== "group") return;
+        const payload = getDragPayload(event);
+        if (!payload || (payload.kind === "item" && payload.id === item.id)) return;
+        event.preventDefault();
+        event.stopPropagation();
+        if (event.dataTransfer) event.dataTransfer.dropEffect = payload.kind === "palette" ? "copy" : "move";
+        setGroupDropActive(true);
+      }}
+      onDragLeave={(event) => {
+        if (!groupDropActive) return;
+        const related = event.relatedTarget;
+        if (related instanceof Node && event.currentTarget.contains(related)) return;
+        setGroupDropActive(false);
+      }}
+      onDrop={(event) => {
+        if (editingLocked || kind !== "group") return;
+        const payload = getDragPayload(event);
+        if (!payload || (payload.kind === "item" && payload.id === item.id)) return;
+        event.preventDefault();
+        event.stopPropagation();
+        setGroupDropActive(false);
+        clearDragPayload();
+        if (payload.kind === "palette") onAddIntoGroup(payload.type, item.id);
+        else onMoveIntoGroup(payload.id, item.id);
+      }}
       onClick={() => onSelect(item.id)}
       aria-pressed={selected}
       aria-label={displayedTitle || presentation.label}
@@ -167,10 +199,15 @@ function PreviewItem({
           {configuredImage && <img class="touch-item-image touch-item-config-image" src={configuredImage} alt="" aria-hidden="true" draggable={false} />}
           {showFallbackIcon && (
             <span class="touch-item-symbol" aria-hidden="true">
-              {brightnessDirection ? <BrightnessIcon direction={brightnessDirection} /> : presentation.icon}
+              <ItemTypeIcon type={kind} fallback={presentation.icon} />
             </span>
           )}
           {displayedTitle && <span class="touch-item-label">{displayedTitle}</span>}
+          {kind === "group" && (
+            <span class="touch-item-group-count" aria-hidden="true">
+              {Array.isArray(item.items) ? item.items.length : 0}
+            </span>
+          )}
         </>
       )}
     </button>
@@ -480,6 +517,8 @@ export function TouchBarPreview(props: TouchBarPreviewProps) {
                           simulation={props.simulation}
                           geometry={geometries.get(item.id)}
                           onSelect={props.onSelect}
+                          onMoveIntoGroup={props.onMoveIntoGroup}
+                          onAddIntoGroup={props.onAddIntoGroup}
                           editingLocked={props.editingLocked ?? false}
                           previewScale={scale}
                         />
