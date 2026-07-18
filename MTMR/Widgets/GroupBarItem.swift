@@ -23,6 +23,7 @@ class GroupBarItem: NSPopoverTouchBarItem, NSTouchBarDelegate {
         jsonItems = items
         centerScrollArea = NSTouchBarItem.Identifier(identifier.rawValue + ".scrollArea")
         super.init(identifier: identifier)
+        collapsedRepresentationLabel = "Groupe"
         popoverTouchBar.delegate = self
     }
 

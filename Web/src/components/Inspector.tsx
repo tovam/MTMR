@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "preact/hooks";
+import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import {
   ACTION_TRIGGERS,
   actionSchemaForType,
@@ -470,12 +470,27 @@ function GroupItemsEditor({
   const items = Array.isArray(group.items) ? group.items : [];
   const types = schemaItemTypes(schema);
   const [dropTarget, setDropTarget] = useState<GroupDropTarget>();
+  const dropTargetRef = useRef<GroupDropTarget>();
+  const updateDropTarget = (target?: GroupDropTarget) => {
+    dropTargetRef.current = target;
+    setDropTarget(target);
+  };
+  useEffect(() => {
+    const clear = () => updateDropTarget(undefined);
+    window.addEventListener("dragend", clear);
+    window.addEventListener("drop", clear);
+    return () => {
+      window.removeEventListener("dragend", clear);
+      window.removeEventListener("drop", clear);
+    };
+  }, []);
   const drop = (event: DragEvent, align: Alignment) => {
     event.preventDefault();
     event.stopPropagation();
     const payload = getDragPayload(event);
-    const beforeID = dropTarget?.align === align ? dropTarget.beforeID : undefined;
-    setDropTarget(undefined);
+    const currentTarget = dropTargetRef.current;
+    const beforeID = currentTarget?.align === align ? currentTarget.beforeID : undefined;
+    updateDropTarget(undefined);
     clearDragPayload();
     if (!payload) return;
     if (payload.kind === "palette") onAddToGroup(payload.type, group.id, align, beforeID);
@@ -499,7 +514,7 @@ function GroupItemsEditor({
           {types.map((entry) => <option value={entry.type} key={entry.type}>{entry.label}</option>)}
         </select>
       </div>
-      <p class="group-editor-hint">Glissez ici un composant de la palette ou un élément existant.</p>
+      <p class="group-editor-hint">Ce bouton ouvre une sous-barre sur la Touch Bar physique. Glissez ici les composants qu’elle doit contenir.</p>
       <div class="group-lanes">
         {(["left", "center", "right"] as Alignment[]).map((align) => {
           const laneItems = items.filter((item) => (item.align ?? "left") === align);
@@ -511,19 +526,22 @@ function GroupItemsEditor({
               key={align}
               onDragOver={(event) => {
                 const payload = getDragPayload(event);
-                if (payload?.kind === "item" && payload.id === group.id) return;
+                if (!payload || (payload.kind === "item" && payload.id === group.id)) {
+                  updateDropTarget(undefined);
+                  return;
+                }
                 event.preventDefault();
                 event.stopPropagation();
-                if (event.dataTransfer) event.dataTransfer.dropEffect = payload?.kind === "palette" ? "copy" : "move";
-                setDropTarget({
+                if (event.dataTransfer) event.dataTransfer.dropEffect = payload.kind === "palette" ? "copy" : "move";
+                updateDropTarget({
                   align,
-                  beforeID: groupInsertionTarget(event.currentTarget, event.clientY, payload?.kind === "item" ? payload.id : undefined),
+                  beforeID: groupInsertionTarget(event.currentTarget, event.clientY, payload.kind === "item" ? payload.id : undefined),
                 });
               }}
               onDragLeave={(event) => {
                 const related = event.relatedTarget;
                 if (related instanceof Node && event.currentTarget.contains(related)) return;
-                setDropTarget((current) => current?.align === align ? undefined : current);
+                if (dropTargetRef.current?.align === align) updateDropTarget(undefined);
               }}
               onDrop={(event) => drop(event, align)}
             >
@@ -539,7 +557,7 @@ function GroupItemsEditor({
                       data-item-id={child.id}
                       draggable
                       onDragStart={(event) => setDragPayload(event, { kind: "item", id: child.id })}
-                      onDragEnd={() => { clearDragPayload(); setDropTarget(undefined); }}
+                      onDragEnd={() => { clearDragPayload(); updateDropTarget(undefined); }}
                     >
                       <button type="button" onClick={() => onSelect(child.id)} title={`Inspecter ${itemEditorName(child)}`}>
                         <span class="group-child-icon" aria-hidden="true"><ItemTypeIcon type={child.type} fallback={presentation.icon} /></span>

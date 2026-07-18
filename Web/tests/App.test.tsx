@@ -340,7 +340,6 @@ describe("éditeur MMTMR", () => {
   });
 
   it("permet de déposer un élément directement dans un groupe", async () => {
-    const user = userEvent.setup();
     const originalFetch = vi.mocked(fetch).getMockImplementation()!;
     const groupedConfig = {
       ...config,
@@ -360,16 +359,30 @@ describe("éditeur MMTMR", () => {
     const child = await screen.findByRole("button", { name: "Bonjour" });
     const preview = screen.getByLabelText("Aperçu de la Touch Bar");
     const group = within(preview).getByRole("button", { name: "Groupe" });
+    const left = within(preview).getByTestId("drop-left");
     fireEvent.dragStart(child);
+    fireEvent.dragOver(left);
+    expect(within(left).getByTestId("drop-indicator-left")).toBeInTheDocument();
     fireEvent.dragOver(group);
     expect(group).toHaveClass("group-drop-active");
+    expect(within(left).queryByTestId("drop-indicator-left")).not.toBeInTheDocument();
     fireEvent.drop(group);
 
     await waitFor(() => expect(screen.queryByRole("button", { name: "Bonjour" })).not.toBeInTheDocument());
-    await user.click(within(preview).getByRole("button", { name: "Groupe" }));
+    await waitFor(() => expect(within(preview).getByRole("button", { name: "Groupe" })).not.toHaveClass("group-drop-active"));
+    expect(within(preview).getByRole("button", { name: "Groupe" })).toHaveAttribute("aria-pressed", "true");
     expect(screen.getByText("Contenu du groupe")).toBeInTheDocument();
     expect(within(screen.getByTestId("group-drop-left")).getByRole("button", { name: /Bonjour staticButton/ })).toBeInTheDocument();
     expect(screen.getByRole("row", { name: /Bonjour staticButton left actif/ })).toHaveAttribute("data-depth", "1");
+
+    const paletteItem = screen.getByTitle("Ajouter Bouton statique");
+    const centerLane = screen.getByTestId("group-drop-center");
+    fireEvent.dragStart(paletteItem);
+    fireEvent.dragOver(centerLane);
+    expect(centerLane.querySelector(".group-drop-indicator")).toBeInTheDocument();
+    fireEvent.dragEnd(paletteItem);
+    await waitFor(() => expect(centerLane.querySelector(".group-drop-indicator")).not.toBeInTheDocument());
+
     await waitFor(() => {
       const put = vi.mocked(fetch).mock.calls.find(([, init]) => init?.method === "PUT");
       const source = JSON.parse(String(put?.[1]?.body)).source as string;

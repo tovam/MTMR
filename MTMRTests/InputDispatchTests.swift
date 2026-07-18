@@ -231,6 +231,13 @@ final class InputDispatchTests: XCTestCase {
         XCTAssertEqual(result.message, "cannot create pair")
         XCTAssertEqual(backend.keyPresses, [53])
     }
+
+    @MainActor
+    func testGroupAlwaysHasAVisiblePhysicalButtonByDefault() {
+        let group = GroupBarItem(identifier: .init("group-visible-test"), items: [])
+
+        XCTAssertEqual(group.collapsedRepresentationLabel, "Groupe")
+    }
 }
 
 @MainActor

@@ -108,6 +108,7 @@ function PreviewItem({
   onSelect,
   onMoveIntoGroup,
   onAddIntoGroup,
+  onClearBarDropTarget,
   editingLocked,
   previewScale,
 }: {
@@ -118,11 +119,22 @@ function PreviewItem({
   onSelect(id: string): void;
   onMoveIntoGroup(id: string, groupID: string): void;
   onAddIntoGroup(type: string, groupID: string): void;
+  onClearBarDropTarget(): void;
   editingLocked: boolean;
   previewScale: number;
 }) {
   const [groupDropActive, setGroupDropActive] = useState(false);
   const kind = geometry?.kind ?? item.type;
+  useEffect(() => {
+    if (kind !== "group") return;
+    const clear = () => setGroupDropActive(false);
+    window.addEventListener("dragend", clear);
+    window.addEventListener("drop", clear);
+    return () => {
+      window.removeEventListener("dragend", clear);
+      window.removeEventListener("drop", clear);
+    };
+  }, [kind]);
   const presentation = itemPresentation(kind);
   const fallbackTitle = displayTitle(item, simulation);
   const displayedTitle = typeof geometry?.title === "string" ? geometry.title : fallbackTitle;
@@ -167,6 +179,7 @@ function PreviewItem({
         if (!payload || (payload.kind === "item" && payload.id === item.id)) return;
         event.preventDefault();
         event.stopPropagation();
+        onClearBarDropTarget();
         if (event.dataTransfer) event.dataTransfer.dropEffect = payload.kind === "palette" ? "copy" : "move";
         setGroupDropActive(true);
       }}
@@ -519,6 +532,7 @@ export function TouchBarPreview(props: TouchBarPreviewProps) {
                           onSelect={props.onSelect}
                           onMoveIntoGroup={props.onMoveIntoGroup}
                           onAddIntoGroup={props.onAddIntoGroup}
+                          onClearBarDropTarget={() => updateDropTarget(undefined)}
                           editingLocked={props.editingLocked ?? false}
                           previewScale={scale}
                         />

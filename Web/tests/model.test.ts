@@ -130,7 +130,7 @@ describe("modèle de configuration", () => {
   });
 
   it("initialise un groupe vide prêt à recevoir des composants", () => {
-    expect(createItem("group")).toMatchObject({ type: "group", items: [] });
+    expect(createItem("group")).toMatchObject({ type: "group", title: "Groupe", items: [] });
   });
 
   it("crée un Dock ajusté à ses icônes par défaut", () => {

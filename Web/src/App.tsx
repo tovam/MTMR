@@ -83,14 +83,14 @@ export function App() {
     if (editor.formLocked) return;
     const item = createItem(type, editor.schema);
     editor.commitDocument(addItemToGroup(editor.document, item, groupID, align, beforeID), "group.item.added");
-    editor.select(item.id);
+    editor.select(groupID);
     setInspectorCollapsed(false);
   };
 
   const moveToGroup = (id: string, groupID: string, align?: Alignment, beforeID?: string) => {
     if (editor.formLocked) return;
     editor.commitDocument(moveItemToGroup(editor.document, id, groupID, align, beforeID), "group.item.moved");
-    editor.select(id);
+    editor.select(groupID);
     setInspectorCollapsed(false);
   };
 

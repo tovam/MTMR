@@ -118,7 +118,12 @@ enum MMTMRConfigurationSchema {
                 "disableMarquee": boolProperty(defaultValue: false),
             ]),
             itemVariant("group", title: "Group", fields: [
-                "items": .object(["type": .string("array"), "items": reference("#/$defs/item")]),
+                "title": stringProperty("Displayed title of the button that opens the group.", defaultValue: "Groupe"),
+                "items": .object([
+                    "type": .string("array"),
+                    "items": reference("#/$defs/item"),
+                    "default": .array([]),
+                ]),
             ], required: ["items"]),
             itemVariant("nightShift", title: "Night Shift"),
             itemVariant("dnd", title: "Do Not Disturb"),

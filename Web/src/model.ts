@@ -33,7 +33,7 @@ export const FALLBACK_ITEM_TYPES: readonly PaletteItemPresentation[] = [
   { type: "currency", label: "Devise", icon: "€", description: "Convertit et affiche une paire de devises. Le mode complet ajoute davantage de détail.", examples: ["EUR → USD", "GBP → EUR"] },
   { type: "inputsource", label: "Source de saisie", icon: "⌨", description: "Affiche la source de saisie active. Utile pour repérer immédiatement la langue du clavier.", examples: ["ABC", "FR", "RU"] },
   { type: "music", label: "Musique", icon: "♫", description: "Affiche le média en cours de lecture. Le texte peut défiler lorsque le titre est long.", examples: ["♫ Lecture", "Artiste — titre"] },
-  { type: "group", label: "Groupe", icon: "⧉", description: "Regroupe plusieurs composants dans un sous-ensemble. Les éléments imbriqués conservent leur ordre.", examples: ["Transport", "Système"] },
+  { type: "group", label: "Groupe", icon: "⧉", description: "Crée un bouton qui ouvre une sous-barre sur la Touch Bar physique. Les composants rangés dedans quittent la barre principale.", examples: ["Transport", "Système"] },
   { type: "nightShift", label: "Night Shift", icon: "◐", description: "Active ou désactive Night Shift. L’état exact est fourni par macOS.", examples: ["Activé", "Désactivé"] },
   { type: "dnd", label: "Ne pas déranger", icon: "☾", description: "Bascule le mode Ne pas déranger. Le bouton reflète l’état système lorsque disponible.", examples: ["Concentration", "Silence"] },
   { type: "pomodoro", label: "Pomodoro", icon: "◴", description: "Lance une alternance travail et repos. Les deux durées sont configurables.", examples: ["25 min", "5 min"] },
@@ -174,7 +174,10 @@ export function createItem(type: string, schema?: JsonSchema): ItemConfig {
     }
   }
   if (type === "staticButton" && item.title === undefined) item.title = "Nouveau";
-  if (type === "group" && item.items === undefined) item.items = [];
+  if (type === "group") {
+    if (item.title === undefined) item.title = "Groupe";
+    if (item.items === undefined) item.items = [];
+  }
   if (item.editorName === undefined && typeSchema?.properties?.editorName !== undefined) {
     item.editorName = FALLBACK_ITEM_TYPES.find((entry) => entry.type === type)?.label ?? type;
   }
