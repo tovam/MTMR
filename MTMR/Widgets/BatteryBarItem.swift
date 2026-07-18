@@ -29,7 +29,7 @@ class BatteryBarItem: CustomButtonTouchBarItem {
         attributedTitle = batteryInfo.formattedInfo()
     }
 
-    deinit {
+    isolated deinit {
         batteryInfo.stop()
     }
 }

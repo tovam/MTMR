@@ -170,7 +170,7 @@ class CurrencyBarItem: CustomButtonTouchBarItem {
         attributedTitle = newTitle
     }
     
-    deinit {
+    isolated deinit {
         activity.invalidate()
     }
 }

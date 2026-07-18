@@ -145,7 +145,7 @@ class YandexWeatherBarItem: CustomButtonTouchBarItem, @preconcurrency CLLocation
         updateWeather()
     }
 
-    deinit {
+    isolated deinit {
         activity.invalidate()
     }
 }

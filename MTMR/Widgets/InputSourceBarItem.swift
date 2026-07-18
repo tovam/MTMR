@@ -28,7 +28,7 @@ class InputSourceBarItem: CustomButtonTouchBarItem {
         fatalError("init(coder:) has not been implemented")
     }
 
-    deinit {
+    isolated deinit {
         CFNotificationCenterRemoveEveryObserver(notificationCenter, UnsafeRawPointer(Unmanaged.passUnretained(self).toOpaque()))
     }
 

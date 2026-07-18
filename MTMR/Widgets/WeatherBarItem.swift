@@ -136,7 +136,7 @@ class WeatherBarItem: CustomButtonTouchBarItem, @preconcurrency CLLocationManage
         updateWeather()
     }
     
-    deinit {
+    isolated deinit {
         activity.invalidate()
     }
 }
