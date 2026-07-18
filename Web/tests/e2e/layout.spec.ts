@@ -35,7 +35,11 @@ test.beforeEach(async ({ page }) => {
     }
   });
   await page.goto("/");
-  await expect(page.getByRole("button", { name: "Élément 0" })).toBeVisible();
+  await expect(
+    page
+      .getByTestId("preview-scroll")
+      .getByRole("button", { name: "Élément 0", exact: true }),
+  ).toBeVisible();
 });
 
 test("le viewport n’a jamais de scroll global", async ({ page }) => {
