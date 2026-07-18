@@ -78,7 +78,8 @@ jobs:
             DEVELOPMENT_TEAM="" \
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_ALLOWED=NO \
-            CODE_SIGNING_REQUIRED=NO
+            CODE_SIGNING_REQUIRED=NO \
+            2>&1 | tee "$CI_ROOT/swift-tests.log"
 
       - name: Archive the unsigned application
         run: |
@@ -94,7 +95,8 @@ jobs:
             DEVELOPMENT_TEAM="" \
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_ALLOWED=NO \
-            CODE_SIGNING_REQUIRED=NO
+            CODE_SIGNING_REQUIRED=NO \
+            2>&1 | tee "$CI_ROOT/archive.log"
 
       - name: Verify the application archive
         run: |
@@ -126,6 +128,8 @@ jobs:
           name: MMTMR-test-results-${{ github.sha }}
           path: |
             ${{ env.CI_ROOT }}/MMTMRTests.xcresult
+            ${{ env.CI_ROOT }}/swift-tests.log
+            ${{ env.CI_ROOT }}/archive.log
             Web/test-results
             Web/playwright-report
           if-no-files-found: ignore
