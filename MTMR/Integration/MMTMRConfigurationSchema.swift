@@ -94,7 +94,7 @@ enum MMTMRConfigurationSchema {
             itemVariant("battery", title: "Battery"),
             itemVariant("cpu", title: "CPU", fields: ["refreshInterval": numberProperty(defaultValue: 5, minimum: 0.001)]),
             itemVariant("dock", title: "Dock", fields: [
-                "autoResize": boolProperty(defaultValue: false),
+                "autoResize": boolProperty(defaultValue: true),
                 "filter": stringProperty("Application bundle-id regular expression."),
             ]),
             itemVariant("volume", title: "Volume"),

@@ -331,6 +331,7 @@ enum ItemType: Decodable {
         case restTime
         case flip
         case autoResize
+        case width
         case filter
         case disableMarquee
         case alternativeImages
@@ -400,7 +401,11 @@ enum ItemType: Decodable {
             self = .cpu(refreshInterval: refreshInterval)
 
         case .dock:
-            let autoResize = try container.decodeIfPresent(Bool.self, forKey: .autoResize) ?? false
+            // A Dock without an explicit width should hug its application icons.
+            // Keep the historical fixed-width behaviour only for configurations
+            // that deliberately provide `width` and omit `autoResize`.
+            let hasManualWidth = container.contains(.width)
+            let autoResize = try container.decodeIfPresent(Bool.self, forKey: .autoResize) ?? !hasManualWidth
             let filterRegexString = try container.decodeIfPresent(String.self, forKey: .filter)
             self = .dock(autoResize: autoResize, filter: filterRegexString)
 

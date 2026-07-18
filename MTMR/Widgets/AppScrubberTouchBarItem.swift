@@ -9,7 +9,7 @@ import Cocoa
 
 class AppScrubberTouchBarItem: NSCustomTouchBarItem {
     private var scrollView = NSScrollView()
-    private var autoResize: Bool = false
+    private var autoResize: Bool = true
     private var widthConstraint: NSLayoutConstraint?
     private let filter: NSRegularExpression?
 
@@ -23,7 +23,7 @@ class AppScrubberTouchBarItem: NSCustomTouchBarItem {
     private var applications: [DockItem] = []
     private var items: [DockBarItem] = []
 
-    init(identifier: NSTouchBarItem.Identifier, autoResize: Bool = false, filter: NSRegularExpression? = nil) {
+    init(identifier: NSTouchBarItem.Identifier, autoResize: Bool = true, filter: NSRegularExpression? = nil) {
         self.filter = filter
         super.init(identifier: identifier)
         self.autoResize = autoResize

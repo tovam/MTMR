@@ -97,6 +97,25 @@ class ParseConfig: XCTestCase {
         }
     }
 
+    func testDockHugsItsIconsUnlessAManualWidthWasRequested() throws {
+        let fixture = """
+            [
+              { "type": "dock" },
+              { "type": "dock", "width": 420 },
+              { "type": "dock", "width": 420, "autoResize": true },
+              { "type": "dock", "autoResize": false }
+            ]
+        """.data(using: .utf8)!
+
+        let items = try JSONDecoder().decode([BarItemDefinition].self, from: fixture)
+        let automaticValues = items.compactMap { item -> Bool? in
+            guard case let .dock(autoResize: automatic, filter: _) = item.type else { return nil }
+            return automatic
+        }
+
+        XCTAssertEqual(automaticValues, [true, false, true, false])
+    }
+
     func testExtendedWidthForPredefinedItem() {
         let buttonKeycodeFixture = """
             [  { "type": "escape", "width": 110} ]

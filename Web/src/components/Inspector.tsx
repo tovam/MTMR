@@ -492,9 +492,14 @@ export function Inspector({
     ];
     const rank = new Map(preferred.map((name, index) => [name, index]));
     return Object.entries(properties)
-      .filter(([name]) => !["actions", "enabled", "bordered"].includes(name))
+      .filter(([name]) => {
+        if (["actions", "enabled", "bordered"].includes(name)) return false;
+        if (item?.type === "dock" && name === "autoResize") return false;
+        if (item?.type === "dock" && item.autoResize !== false && name === "width") return false;
+        return true;
+      })
       .sort(([left], [right]) => (rank.get(left) ?? 1_000) - (rank.get(right) ?? 1_000));
-  }, [properties]);
+  }, [item, properties]);
 
   return (
     <aside class={`inspector side-panel ${collapsed ? "is-collapsed" : ""}`} aria-label="Inspecteur">
@@ -538,6 +543,18 @@ export function Inspector({
                   checked={item.bordered !== false}
                   onChange={(bordered) => onChange({ ...item, bordered })}
                 />
+                {item.type === "dock" && (
+                  <AppleToggle
+                    label="Largeur automatique"
+                    detail="Ajuster le Dock aux icônes (recommandé)"
+                    checked={item.autoResize !== false}
+                    onChange={(autoResize) => {
+                      const next: ItemConfig = { ...item, autoResize };
+                      if (autoResize) delete next.width;
+                      onChange(next);
+                    }}
+                  />
+                )}
               </div>
               <InlineDiagnostics diagnostics={diagnosticsAtPath(diagnostics, itemPath, false)} />
               <div class="property-list">

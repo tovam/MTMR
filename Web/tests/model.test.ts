@@ -74,6 +74,25 @@ describe("modèle de configuration", () => {
     expect(addItem({ formatVersion: 1, items: [] }, item, "center").items[0].align).toBe("center");
   });
 
+  it("crée un Dock ajusté à ses icônes par défaut", () => {
+    const schema: JsonSchema = {
+      properties: {
+        items: {
+          items: {
+            oneOf: [{
+              properties: {
+                type: { const: "dock" },
+                autoResize: { type: "boolean", default: true },
+              },
+            }],
+          },
+        },
+      },
+    };
+
+    expect(createItem("dock", schema)).toMatchObject({ type: "dock", autoResize: true });
+  });
+
   it("n’ajoute editorName que lorsque le schéma du binaire le permet", () => {
     const oldSchema: JsonSchema = {
       properties: { items: { items: { oneOf: [{ properties: { type: { const: "staticButton" } } }] } } },

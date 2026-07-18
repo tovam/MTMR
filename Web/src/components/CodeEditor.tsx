@@ -47,10 +47,10 @@ export function CodeEditor({ value, onChange, label = "Configuration JSON" }: Co
           }
         }),
         EditorView.theme({
-          "&": { height: "100%", color: "#20252a", backgroundColor: "#f8f9fa" },
+          "&": { height: "100%", color: "#20262b", backgroundColor: "#ffffff" },
           ".cm-scroller": { overflow: "auto", fontFamily: "var(--font-mono)" },
           ".cm-content": { padding: "12px 0", caretColor: "#0a64bd" },
-          ".cm-gutters": { backgroundColor: "#e2e4e6", color: "#737b82", borderRight: "1px solid #c8cccf" },
+          ".cm-gutters": { backgroundColor: "#f1f3f4", color: "#747e86", borderRight: "1px solid #dde1e4" },
           ".cm-activeLine": { backgroundColor: "rgba(10, 100, 189, .065)" },
           ".cm-activeLineGutter": { backgroundColor: "#d5e5f4", color: "#39434b" },
           ".cm-selectionBackground, &.cm-focused .cm-selectionBackground": { backgroundColor: "#b8d6f2" },
