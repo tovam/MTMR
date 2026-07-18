@@ -387,11 +387,9 @@ private enum DirectSystemControl {
 @discardableResult
 func HIDPostAuxKey(
     _ key: Int32,
-    backend: any MediaKeyInputBackend = SystemMediaKeyInputBackend()
+    backend: any MediaKeyInputBackend = SystemMediaKeyInputBackend(),
+    directFallback: (Int32) -> InputDispatchResult? = { DirectSystemControl.send(keyCode: $0) }
 ) -> InputDispatchResult {
-    if let directResult = DirectSystemControl.send(keyCode: key) {
-        return InputDispatchDiagnostics.publish(directResult)
-    }
     guard let keyCode = UInt8(exactly: key) else {
         return InputDispatchDiagnostics.publish(InputDispatchResult(
             action: .mediaKey,
@@ -400,5 +398,21 @@ func HIDPostAuxKey(
             message: "Media-key code \(key) is outside the UInt8 range."
         ))
     }
-    return MediaKeyInputDispatcher(backend: backend).send(keyCode: keyCode)
+
+    // A genuine auxiliary-key event lets macOS perform the operation and show
+    // its native volume/brightness OSD. Direct CoreAudio/CoreDisplay writes are
+    // retained only for machines where neither PostEvent backend can dispatch
+    // the key. Never fall back after a partial post, which could apply the
+    // command twice.
+    let mediaResult = MediaKeyInputDispatcher(backend: backend).send(
+        keyCode: keyCode,
+        publishDiagnostics: false
+    )
+    if mediaResult.succeeded || mediaResult.status == .partialDispatch {
+        return InputDispatchDiagnostics.publish(mediaResult)
+    }
+    if let directResult = directFallback(key) {
+        return InputDispatchDiagnostics.publish(directResult)
+    }
+    return InputDispatchDiagnostics.publish(mediaResult)
 }

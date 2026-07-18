@@ -320,6 +320,34 @@ export function moveItem(
   return next;
 }
 
+/**
+ * Reorders an item inside its current source array without changing its
+ * alignment or moving it into/out of a group. `beforeID` must identify a
+ * sibling; omitting it moves the item to the end of its current array.
+ */
+export function reorderItem(
+  document: ConfigDocument,
+  itemID: string,
+  beforeID?: string,
+): ConfigDocument {
+  const next = cloneDocument(document);
+  if (itemID === beforeID) return next;
+  const source = mutableLocation(next.items, itemID);
+  if (!source) return next;
+
+  if (beforeID) {
+    const target = mutableLocation(next.items, beforeID);
+    if (!target || target.collection !== source.collection) return next;
+  }
+
+  const [item] = source.collection.splice(source.index, 1);
+  const insertionIndex = beforeID
+    ? source.collection.findIndex((candidate) => candidate.id === beforeID)
+    : source.collection.length;
+  source.collection.splice(insertionIndex < 0 ? source.collection.length : insertionIndex, 0, item);
+  return next;
+}
+
 export function addItem(
   document: ConfigDocument,
   item: ItemConfig,

@@ -1,7 +1,8 @@
 import type { ComponentChildren } from "preact";
 import { useEffect, useState } from "preact/hooks";
-import { flattenItems, itemEditorName } from "../model";
+import { findItemLocation, flattenItems, itemAncestors, itemEditorName } from "../model";
 import type {
+  Alignment,
   ConfigDocument,
   Diagnostic,
   EditorTab,
@@ -12,6 +13,7 @@ import type {
 } from "../types";
 import { CodeEditor } from "./CodeEditor";
 import { Diagnostics } from "./Diagnostics";
+import { clearDragPayload, getDragPayload, setDragPayload } from "./Palette";
 
 interface WorkspacePanelsProps {
   tab: EditorTab;
@@ -29,6 +31,7 @@ interface WorkspacePanelsProps {
   onSource(source: string): void;
   onDocument(document: ConfigDocument): void;
   onSelectItem(id: string): void;
+  onMoveTreeItem(id: string, parentID: string | undefined, align: Alignment | undefined, beforeID?: string): void;
   onSimulation(context: SimulationContext): void;
   onBeginSimulation(): void;
   onResetSimulation(): void;
@@ -42,14 +45,73 @@ const TABS: Array<{ id: EditorTab; label: string }> = [
   { id: "events", label: "Journal" },
 ];
 
+const BAR_ALIGNMENTS: Alignment[] = ["left", "center", "right"];
+
+interface OrderDropTarget {
+  draggedID: string;
+  kind: "before" | "after" | "inside" | "zone";
+  itemID?: string;
+  parentID?: string;
+  align?: Alignment;
+  beforeID?: string;
+}
+
 function FormPanel({
   document,
   diagnostics,
   onDocument,
   onSelectItem,
+  onMoveTreeItem,
   editingLocked,
-}: Pick<WorkspacePanelsProps, "document" | "diagnostics" | "onDocument" | "onSelectItem" | "editingLocked">) {
+}: Pick<WorkspacePanelsProps, "document" | "diagnostics" | "onDocument" | "onSelectItem" | "onMoveTreeItem" | "editingLocked">) {
+  const [orderDropTarget, setOrderDropTarget] = useState<OrderDropTarget>();
   const flattenedItems = flattenItems(document.items);
+
+  useEffect(() => {
+    const clear = () => setOrderDropTarget(undefined);
+    window.addEventListener("dragend", clear);
+    window.addEventListener("drop", clear);
+    return () => {
+      window.removeEventListener("dragend", clear);
+      window.removeEventListener("drop", clear);
+    };
+  }, []);
+
+  const orderDestination = (
+    event: DragEvent,
+    siblings: ItemConfig[],
+    item: ItemConfig,
+    draggedID: string,
+    parentID?: string,
+  ): OrderDropTarget | undefined => {
+    const remaining = siblings.filter((candidate) => candidate.id !== draggedID);
+    const targetIndex = remaining.findIndex((candidate) => candidate.id === item.id);
+    if (targetIndex < 0) return undefined;
+    const bounds = event.currentTarget instanceof HTMLElement
+      ? event.currentTarget.getBoundingClientRect()
+      : undefined;
+    const relativeY = bounds && bounds.height > 0
+      ? (event.clientY - bounds.top) / bounds.height
+      : 0;
+    if (item.type === "group" && relativeY >= 0.28 && relativeY <= 0.72) {
+      return {
+        draggedID,
+        kind: "inside",
+        itemID: item.id,
+        parentID: item.id,
+      };
+    }
+    const kind = relativeY >= 0.5 ? "after" : "before";
+    return {
+      draggedID,
+      kind,
+      itemID: item.id,
+      parentID,
+      align: item.align ?? "left",
+      beforeID: kind === "before" ? item.id : remaining[targetIndex + 1]?.id,
+    };
+  };
+
   const rows = (
     items: ItemConfig[],
     depth = 0,
@@ -61,14 +123,87 @@ function FormPanel({
       <div class="item-tree-entry" key={item.id}>
         <button
           type="button"
-          class={`item-row ${depth > 0 ? "is-nested" : ""}`}
+          class={`item-row ${depth > 0 ? "is-nested" : ""} ${orderDropTarget?.itemID === item.id ? `order-drop-${orderDropTarget.kind}` : ""}`}
           role="row"
           style={{ "--item-depth": depth }}
           data-depth={depth}
+          data-item-id={item.id}
+          draggable={!editingLocked}
+          onDragStart={(event) => {
+            if (editingLocked) {
+              event.preventDefault();
+              return;
+            }
+            setOrderDropTarget(undefined);
+            setDragPayload(event, { kind: "item", id: item.id });
+          }}
+          onDragEnd={() => {
+            clearDragPayload();
+            setOrderDropTarget(undefined);
+          }}
+          onDragOver={(event) => {
+            if (editingLocked) return;
+            const payload = getDragPayload(event);
+            if (!payload || payload.kind !== "item") return;
+            event.stopPropagation();
+            if (payload.id === item.id) {
+              setOrderDropTarget(undefined);
+              return;
+            }
+            const source = findItemLocation(document, payload.id);
+            const target = findItemLocation(document, item.id);
+            if (
+              !source
+              || !target
+              || itemAncestors(document, item.id).some((ancestor) => ancestor.id === payload.id)
+            ) {
+              setOrderDropTarget(undefined);
+              return;
+            }
+            const destination = orderDestination(event, items, item, payload.id, target.parent?.id);
+            if (!destination) return;
+            event.preventDefault();
+            if (event.dataTransfer) event.dataTransfer.dropEffect = "move";
+            setOrderDropTarget(destination);
+          }}
+          onDragLeave={(event) => {
+            const related = event.relatedTarget;
+            if (related instanceof Node && event.currentTarget.contains(related)) return;
+            if (orderDropTarget?.itemID === item.id) setOrderDropTarget(undefined);
+          }}
+          onDrop={(event) => {
+            if (editingLocked) return;
+            const payload = getDragPayload(event);
+            if (!payload || payload.kind !== "item") return;
+            event.stopPropagation();
+            if (payload.id === item.id) {
+              clearDragPayload();
+              setOrderDropTarget(undefined);
+              return;
+            }
+            const source = findItemLocation(document, payload.id);
+            const target = findItemLocation(document, item.id);
+            if (
+              !source
+              || !target
+              || itemAncestors(document, item.id).some((ancestor) => ancestor.id === payload.id)
+            ) {
+              clearDragPayload();
+              setOrderDropTarget(undefined);
+              return;
+            }
+            const destination = orderDestination(event, items, item, payload.id, target.parent?.id);
+            if (!destination) return;
+            event.preventDefault();
+            clearDragPayload();
+            setOrderDropTarget(undefined);
+            onMoveTreeItem(payload.id, destination.parentID, destination.align, destination.beforeID);
+          }}
           onClick={() => onSelectItem(item.id)}
           disabled={editingLocked}
           title={`Inspecter ${itemEditorName(item)}`}
         >
+          <span class="order-drag-handle" aria-hidden="true">⠿</span>
           <span class="row-index">{position.map((part) => String(part).padStart(2, "0")).join(".")}</span>
           <strong>{itemEditorName(item)}</strong>
           <code>{item.type}</code>
@@ -76,6 +211,19 @@ function FormPanel({
           <span class={item.enabled === false ? "status-disabled" : "status-enabled"}>
             {item.enabled === false ? "désactivé" : "actif"}
           </span>
+          {orderDropTarget?.itemID === item.id && ["before", "after"].includes(orderDropTarget.kind) && (
+            <span
+              class="item-order-drop-indicator"
+              data-testid={`order-drop-${item.id}`}
+              data-edge={orderDropTarget.kind}
+              aria-hidden="true"
+            />
+          )}
+          {orderDropTarget?.itemID === item.id && orderDropTarget.kind === "inside" && (
+            <span class="item-order-group-target" data-testid={`order-drop-${item.id}`} aria-hidden="true">
+              Dans le groupe
+            </span>
+          )}
         </button>
         {children.length > 0 && <div class="item-tree-children">{rows(children, depth + 1, position)}</div>}
       </div>
@@ -113,11 +261,53 @@ function FormPanel({
             <span class="eyebrow">Barre</span>
             <h3>Ordre des éléments</h3>
           </div>
-          <span class="section-subtitle">Cliquez une ligne pour l’ouvrir dans l’inspecteur.</span>
+          <span class="section-subtitle">Glissez entre la racine, les zones et les groupes ; cliquez pour inspecter.</span>
         </div>
         <div class="item-table" role="table" aria-label="Éléments configurés">
-          {rows(document.items)}
-          {document.items.length === 0 && <div class="empty-state compact">La barre est vide.</div>}
+          {BAR_ALIGNMENTS.map((align) => {
+            const alignedItems = document.items.filter((item) => (item.align ?? "left") === align);
+            const zoneDropActive = orderDropTarget?.kind === "zone" && orderDropTarget.align === align;
+            return (
+              <div
+                class={`item-alignment-section ${zoneDropActive ? "order-zone-drop-active" : ""}`}
+                data-align={align}
+                data-testid={`order-zone-${align}`}
+                key={align}
+                onDragOver={(event) => {
+                  if (editingLocked) return;
+                  const payload = getDragPayload(event);
+                  if (!payload || payload.kind !== "item" || !findItemLocation(document, payload.id)) return;
+                  event.preventDefault();
+                  event.stopPropagation();
+                  if (event.dataTransfer) event.dataTransfer.dropEffect = "move";
+                  setOrderDropTarget({ draggedID: payload.id, kind: "zone", align });
+                }}
+                onDragLeave={(event) => {
+                  const related = event.relatedTarget;
+                  if (related instanceof Node && event.currentTarget.contains(related)) return;
+                  if (zoneDropActive) setOrderDropTarget(undefined);
+                }}
+                onDrop={(event) => {
+                  if (editingLocked) return;
+                  const payload = getDragPayload(event);
+                  if (!payload || payload.kind !== "item" || !findItemLocation(document, payload.id)) return;
+                  event.preventDefault();
+                  event.stopPropagation();
+                  clearDragPayload();
+                  setOrderDropTarget(undefined);
+                  onMoveTreeItem(payload.id, undefined, align);
+                }}
+              >
+                <div class="item-alignment-divider" role="separator" aria-label={`Zone ${align}`}>
+                  <span>{align.toUpperCase()}</span>
+                </div>
+                {alignedItems.length > 0
+                  ? <div class="item-alignment-rows">{rows(alignedItems)}</div>
+                  : <div class="item-alignment-empty">Aucun élément</div>}
+                {zoneDropActive && <span class="item-zone-drop-indicator" data-testid={`order-zone-drop-${align}`} aria-hidden="true" />}
+              </div>
+            );
+          })}
         </div>
       </section>
       {diagnostics.length > 0 && (
@@ -335,6 +525,7 @@ export function WorkspacePanels(props: WorkspacePanelsProps) {
             editingLocked={props.editingLocked}
             onDocument={props.onDocument}
             onSelectItem={props.onSelectItem}
+            onMoveTreeItem={props.onMoveTreeItem}
           />
         )}
         {props.tab === "json" && (

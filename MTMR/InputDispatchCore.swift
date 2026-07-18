@@ -335,7 +335,11 @@ struct MediaKeyInputDispatcher: Sendable {
     let backend: any MediaKeyInputBackend
 
     @discardableResult
-    func send(keyCode: UInt8) -> InputDispatchResult {
+    func send(keyCode: UInt8, publishDiagnostics: Bool = true) -> InputDispatchResult {
+        func finish(_ result: InputDispatchResult) -> InputDispatchResult {
+            publishDiagnostics ? InputDispatchDiagnostics.publish(result) : result
+        }
+
         let coreGraphicsGranted = backend.hasCoreGraphicsPostEventAccess()
             || backend.requestCoreGraphicsPostEventAccess()
         var coreGraphicsFailure: String?
@@ -345,7 +349,7 @@ struct MediaKeyInputDispatcher: Sendable {
                 // CGEventPost has no delivery result. Once the complete pair has
                 // been posted, never invoke IOHID as that could emit the action
                 // twice even if the system later ignores the CG event.
-                return InputDispatchDiagnostics.publish(InputDispatchResult(
+                return finish(InputDispatchResult(
                     action: .mediaKey,
                     backend: .coreGraphicsAuxiliary,
                     status: .success,
@@ -362,7 +366,7 @@ struct MediaKeyInputDispatcher: Sendable {
         let initialAccess = backend.ioHIDPostEventAccess()
         let ioHIDGranted = initialAccess == .granted || backend.requestIOHIDPostEventAccess()
         guard ioHIDGranted else {
-            return InputDispatchDiagnostics.publish(InputDispatchResult(
+            return finish(InputDispatchResult(
                 action: .mediaKey,
                 backend: .none,
                 status: .permissionDenied,
@@ -374,7 +378,7 @@ struct MediaKeyInputDispatcher: Sendable {
 
         let fallback = backend.postUsingIOHID(keyCode: keyCode)
         if fallback.succeeded {
-            return InputDispatchDiagnostics.publish(InputDispatchResult(
+            return finish(InputDispatchResult(
                 action: .mediaKey,
                 backend: .ioHID,
                 status: .success,
@@ -386,7 +390,7 @@ struct MediaKeyInputDispatcher: Sendable {
         }
 
         if fallback.keyDownPosted {
-            return InputDispatchDiagnostics.publish(InputDispatchResult(
+            return finish(InputDispatchResult(
                 action: .mediaKey,
                 backend: .ioHID,
                 status: .partialDispatch,
@@ -397,7 +401,7 @@ struct MediaKeyInputDispatcher: Sendable {
             ))
         }
 
-        return InputDispatchDiagnostics.publish(InputDispatchResult(
+        return finish(InputDispatchResult(
             action: .mediaKey,
             backend: .ioHID,
             status: .backendFailure,

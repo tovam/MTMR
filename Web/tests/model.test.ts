@@ -7,6 +7,7 @@ import {
   moveItem,
   moveItemToGroup,
   parseSource,
+  reorderItem,
   schemaItemTypes,
   stableSource,
 } from "../src/model";
@@ -63,6 +64,32 @@ describe("modèle de configuration", () => {
     expect(result.items.map((item) => item.id)).toEqual(["a", "b"]);
     expect(result.items[0].align).toBe("right");
     expect(document.items[0].align).toBe("left");
+  });
+
+  it("réordonne la source sans changer l’alignement ni le niveau d’imbrication", () => {
+    const document: ConfigDocument = {
+      formatVersion: 1,
+      items: [
+        { id: "a", type: "staticButton", align: "left" },
+        { id: "b", type: "staticButton", align: "right" },
+        { id: "group", type: "group", items: [
+          { id: "c", type: "volumeDown", align: "left" },
+          { id: "d", type: "volumeUp", align: "right" },
+        ] },
+      ],
+    };
+
+    const root = reorderItem(document, "b", "a");
+    expect(root.items.map((item) => item.id)).toEqual(["b", "a", "group"]);
+    expect(root.items[0].align).toBe("right");
+
+    const nested = reorderItem(root, "d", "c");
+    expect(nested.items[2].items?.map((item) => item.id)).toEqual(["d", "c"]);
+    expect(nested.items[2].items?.[0].align).toBe("right");
+    expect(document.items.map((item) => item.id)).toEqual(["a", "b", "group"]);
+
+    const refusedCrossLevel = reorderItem(nested, "c", "a");
+    expect(refusedCrossLevel).toEqual(nested);
   });
 
   it("ajoute et déplace réellement des éléments dans un groupe", () => {

@@ -79,6 +79,20 @@ export function App() {
     editor.select(id);
   };
 
+  const moveFromOrder = (
+    id: string,
+    parentID: string | undefined,
+    align: Alignment | undefined,
+    beforeID?: string,
+  ) => {
+    if (editor.formLocked) return;
+    const document = parentID
+      ? moveItemToGroup(editor.document, id, parentID, align, beforeID)
+      : moveItem(editor.document, id, align ?? "left", beforeID);
+    editor.commitDocument(document, parentID ? "group.item.moved" : "item.moved");
+    editor.select(id);
+  };
+
   const addToGroup = (type: string, groupID: string, align: Alignment = "left", beforeID?: string) => {
     if (editor.formLocked) return;
     const item = createItem(type, editor.schema);
@@ -189,6 +203,7 @@ export function App() {
             onSource={editor.setRawSource}
             onDocument={(document) => editor.commitDocument(document, "document.changed")}
             onSelectItem={selectFromList}
+            onMoveTreeItem={moveFromOrder}
             onSimulation={editor.updateSimulation}
             onBeginSimulation={editor.beginSimulation}
             onResetSimulation={editor.resetSimulation}

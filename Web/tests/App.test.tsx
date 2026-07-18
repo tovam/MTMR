@@ -206,6 +206,147 @@ describe("éditeur MMTMR", () => {
     expect(screen.getByRole("heading", { name: "Bonjour" })).toBeInTheDocument();
   });
 
+  it("sépare clairement les éléments des zones left, center et right", async () => {
+    render(<App />);
+    await screen.findByRole("row", { name: /Bonjour staticButton/ });
+    expect(screen.getByRole("separator", { name: "Zone left" })).toHaveTextContent("LEFT");
+    expect(screen.getByRole("separator", { name: "Zone center" })).toHaveTextContent("CENTER");
+    expect(screen.getByRole("separator", { name: "Zone right" })).toHaveTextContent("RIGHT");
+    expect(within(screen.getByTestId("order-zone-left")).getByRole("row", { name: /Bonjour/ })).toBeInTheDocument();
+    expect(within(screen.getByTestId("order-zone-center")).getByText("Aucun élément")).toBeInTheDocument();
+    expect(within(screen.getByTestId("order-zone-right")).getByText("Aucun élément")).toBeInTheDocument();
+  });
+
+  it("réordonne les éléments directement dans le tableau de la barre", async () => {
+    const originalFetch = vi.mocked(fetch).getMockImplementation()!;
+    const orderedConfig = {
+      ...config,
+      items: [
+        config.items[0],
+        { id: "omega", type: "staticButton", title: "Omega", align: "left", enabled: true },
+      ],
+    };
+    vi.mocked(fetch).mockImplementation(async (input, init) => {
+      if (String(input).endsWith("/config") && init?.method !== "PUT") {
+        return jsonResponse({ source: `${JSON.stringify(orderedConfig, null, 2)}\n`, document: orderedConfig, revision: 4, diagnostics: [], valid: true });
+      }
+      return originalFetch(input, init);
+    });
+
+    render(<App />);
+    const hello = await screen.findByRole("row", { name: /Bonjour staticButton left actif/ });
+    const omega = screen.getByRole("row", { name: /Omega staticButton left actif/ });
+    vi.spyOn(omega, "getBoundingClientRect").mockReturnValue({
+      x: 0,
+      y: 100,
+      left: 0,
+      right: 600,
+      top: 100,
+      bottom: 136,
+      width: 600,
+      height: 36,
+      toJSON: () => ({}),
+    });
+
+    fireEvent.dragStart(hello);
+    const dragOver = new Event("dragover", { bubbles: true, cancelable: true });
+    Object.defineProperty(dragOver, "clientY", { value: 130 });
+    fireEvent(omega, dragOver);
+    expect(screen.getByTestId("order-drop-omega")).toHaveAttribute("data-edge", "after");
+
+    const drop = new Event("drop", { bubbles: true, cancelable: true });
+    Object.defineProperty(drop, "clientY", { value: 130 });
+    fireEvent(omega, drop);
+
+    await waitFor(() => {
+      expect(screen.getAllByRole("row").map((row) => row.getAttribute("data-item-id")))
+        .toEqual(["omega", "hello"]);
+    });
+    expect(screen.queryByTestId("order-drop-omega")).not.toBeInTheDocument();
+    await waitFor(() => {
+      const put = vi.mocked(fetch).mock.calls.find(([, init]) => init?.method === "PUT");
+      const source = JSON.parse(String(put?.[1]?.body)).source as string;
+      const saved = JSON.parse(source) as typeof orderedConfig;
+      expect(saved.items.map((item) => item.id)).toEqual(["omega", "hello"]);
+      expect(saved.items.map((item) => item.align)).toEqual(["left", "left"]);
+    }, { timeout: 2_000 });
+  });
+
+  it("déplace un élément du root vers un groupe puis du groupe vers le root", async () => {
+    const originalFetch = vi.mocked(fetch).getMockImplementation()!;
+    const groupedConfig = {
+      ...config,
+      items: [
+        {
+          id: "tools",
+          type: "group",
+          title: "Outils",
+          align: "left",
+          enabled: true,
+          items: [{ id: "inside", type: "staticButton", title: "Interne", align: "left", enabled: true }],
+        },
+        config.items[0],
+      ],
+    };
+    vi.mocked(fetch).mockImplementation(async (input, init) => {
+      if (String(input).endsWith("/config") && init?.method !== "PUT") {
+        return jsonResponse({ source: `${JSON.stringify(groupedConfig, null, 2)}\n`, document: groupedConfig, revision: 4, diagnostics: [], valid: true });
+      }
+      return originalFetch(input, init);
+    });
+
+    render(<App />);
+    const helloAtRoot = await screen.findByRole("row", { name: /Bonjour staticButton left actif/ });
+    const group = screen.getByRole("row", { name: /Outils group left actif/ });
+    vi.spyOn(group, "getBoundingClientRect").mockReturnValue({
+      x: 0,
+      y: 100,
+      left: 0,
+      right: 600,
+      top: 100,
+      bottom: 140,
+      width: 600,
+      height: 40,
+      toJSON: () => ({}),
+    });
+
+    fireEvent.dragStart(helloAtRoot);
+    const intoGroup = new Event("dragover", { bubbles: true, cancelable: true });
+    Object.defineProperty(intoGroup, "clientY", { value: 120 });
+    fireEvent(group, intoGroup);
+    expect(screen.getByTestId("order-drop-tools")).toHaveTextContent("Dans le groupe");
+
+    const dropIntoGroup = new Event("drop", { bubbles: true, cancelable: true });
+    Object.defineProperty(dropIntoGroup, "clientY", { value: 120 });
+    fireEvent(group, dropIntoGroup);
+
+    let helloInGroup: HTMLElement | undefined;
+    await waitFor(() => {
+      helloInGroup = screen.getByRole("row", { name: /Bonjour staticButton left actif/ });
+      expect(helloInGroup).toHaveAttribute("data-depth", "1");
+    });
+
+    const rightZone = screen.getByTestId("order-zone-right");
+    fireEvent.dragStart(helloInGroup!);
+    fireEvent.dragOver(rightZone);
+    expect(screen.getByTestId("order-zone-drop-right")).toBeInTheDocument();
+    fireEvent.drop(rightZone);
+
+    await waitFor(() => {
+      const helloAtRootRight = within(rightZone).getByRole("row", { name: /Bonjour staticButton right actif/ });
+      expect(helloAtRootRight).toHaveAttribute("data-depth", "0");
+    });
+    await waitFor(() => {
+      const puts = vi.mocked(fetch).mock.calls.filter(([, init]) => init?.method === "PUT");
+      const source = JSON.parse(String(puts.at(-1)?.[1]?.body)).source as string;
+      const saved = JSON.parse(source) as {
+        items: Array<{ id: string; align?: string; items?: Array<{ id: string }> }>;
+      };
+      expect(saved.items.find((item) => item.id === "hello")).toMatchObject({ align: "right" });
+      expect(saved.items.find((item) => item.id === "tools")?.items?.map((item) => item.id)).toEqual(["inside"]);
+    }, { timeout: 2_000 });
+  });
+
   it("place les interrupteurs principaux en tête et respecte leurs valeurs par défaut", async () => {
     const user = userEvent.setup();
     render(<App />);

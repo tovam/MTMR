@@ -162,6 +162,61 @@ final class InputDispatchTests: XCTestCase {
         XCTAssertEqual(backend.ioHIDPostCount, 0)
     }
 
+    func testSystemVolumePrefersARealMediaKeySoMacOSCanShowItsOSD() {
+        let backend = FakeMediaBackend()
+        backend.coreGraphicsHasAccess = true
+        backend.coreGraphicsResult = .success
+        var directFallbackCount = 0
+
+        let result = HIDPostAuxKey(
+            NX_KEYTYPE_SOUND_UP,
+            backend: backend,
+            directFallback: { _ in
+                directFallbackCount += 1
+                return InputDispatchResult(
+                    action: .mediaKey,
+                    backend: .coreAudio,
+                    status: .success,
+                    message: "Direct fallback"
+                )
+            }
+        )
+
+        XCTAssertTrue(result.succeeded)
+        XCTAssertEqual(result.backend, .coreGraphicsAuxiliary)
+        XCTAssertEqual(backend.coreGraphicsPostCount, 1)
+        XCTAssertEqual(directFallbackCount, 0)
+    }
+
+    func testSystemBrightnessUsesDirectControlOnlyWhenMediaPostingFails() {
+        let backend = FakeMediaBackend()
+        backend.coreGraphicsHasAccess = false
+        backend.coreGraphicsRequestResult = false
+        backend.ioHIDAccess = .denied
+        backend.ioHIDRequestResult = false
+        var directFallbackCount = 0
+
+        let result = HIDPostAuxKey(
+            NX_KEYTYPE_BRIGHTNESS_UP,
+            backend: backend,
+            directFallback: { _ in
+                directFallbackCount += 1
+                return InputDispatchResult(
+                    action: .mediaKey,
+                    backend: .coreDisplay,
+                    status: .success,
+                    message: "Direct fallback"
+                )
+            }
+        )
+
+        XCTAssertTrue(result.succeeded)
+        XCTAssertEqual(result.backend, .coreDisplay)
+        XCTAssertEqual(directFallbackCount, 1)
+        XCTAssertEqual(backend.coreGraphicsPostCount, 0)
+        XCTAssertEqual(backend.ioHIDPostCount, 0)
+    }
+
     func testMediaFallsBackToIOHIDOnlyWhenCoreGraphicsPostedNothing() {
         let backend = FakeMediaBackend()
         backend.coreGraphicsHasAccess = true
