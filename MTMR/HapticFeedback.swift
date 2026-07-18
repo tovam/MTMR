@@ -8,6 +8,7 @@
 
 import IOKit
 
+@MainActor
 class HapticFeedback {
 
     // Here we have list of possible IDs for Haptic Generator Device. They are not constant

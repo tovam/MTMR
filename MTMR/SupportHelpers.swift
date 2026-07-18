@@ -39,38 +39,39 @@ extension String {
 }
 
 extension NSImage {
-    func resize(maxSize: NSSize) -> NSImage {
-        var ratio: Float = 0.0
-        let imageWidth = Float(size.width)
-        let imageHeight = Float(size.height)
-        let maxWidth = Float(maxSize.width)
-        let maxHeight = Float(maxSize.height)
-
-        // Get ratio (landscape or portrait)
-        if imageWidth > imageHeight {
-            // Landscape
-            ratio = maxWidth / imageWidth
-        } else {
-            // Portrait
-            ratio = maxHeight / imageHeight
+    func resize(maxSize: NSSize) -> NSImage? {
+        guard size.width.isFinite,
+              size.height.isFinite,
+              maxSize.width.isFinite,
+              maxSize.height.isFinite,
+              size.width > 0,
+              size.height > 0,
+              maxSize.width > 0,
+              maxSize.height > 0
+        else {
+            return nil
         }
 
-        // Calculate new size based on the ratio
-        let newWidth = imageWidth * ratio
-        let newHeight = imageHeight * ratio
+        let ratio = min(maxSize.width / size.width, maxSize.height / size.height)
+        guard ratio.isFinite, ratio > 0 else {
+            return nil
+        }
 
-        // Create a new NSSize object with the newly calculated size
-        let newSize: NSSize = NSSize(width: Int(newWidth), height: Int(newHeight))
+        let newSize = NSSize(width: size.width * ratio, height: size.height * ratio)
+        guard newSize.width.isFinite,
+              newSize.height.isFinite,
+              newSize.width > 0,
+              newSize.height > 0
+        else {
+            return nil
+        }
 
-        // Cast the NSImage to a CGImage
-        var imageRect: NSRect = NSMakeRect(0, 0, size.width, size.height)
-        let imageRef = cgImage(forProposedRect: &imageRect, context: nil, hints: nil)
+        var imageRect = NSRect(origin: .zero, size: size)
+        guard let imageRef = cgImage(forProposedRect: &imageRect, context: nil, hints: nil) else {
+            return nil
+        }
 
-        // Create NSImage from the CGImage using the new size
-        let imageWithNewSize = NSImage(cgImage: imageRef!, size: newSize)
-
-        // Return the new image
-        return imageWithNewSize
+        return NSImage(cgImage: imageRef, size: newSize)
     }
 
     func rotateByDegreess(degrees: CGFloat) -> NSImage {
@@ -100,5 +101,16 @@ extension NSImage {
         rotatedImage.unlockFocus()
 
         return rotatedImage
+    }
+}
+
+extension NSAppleEventDescriptor {
+    var listStringValues: [String] {
+        let itemCount = numberOfItems
+        guard itemCount > 0 else {
+            return []
+        }
+
+        return (1...itemCount).map { atIndex($0)?.stringValue ?? "" }
     }
 }

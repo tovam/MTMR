@@ -7,9 +7,9 @@
 //
 
 import Cocoa
-import CoreLocation
+@preconcurrency import CoreLocation
 
-class WeatherBarItem: CustomButtonTouchBarItem, CLLocationManagerDelegate {
+class WeatherBarItem: CustomButtonTouchBarItem, @preconcurrency CLLocationManagerDelegate {
     private let activity: NSBackgroundActivityScheduler
     private var units: String
     private var api_key: String

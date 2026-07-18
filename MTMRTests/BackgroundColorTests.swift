@@ -1,3 +1,4 @@
+import AppKit
 import XCTest
 
 class BackgroundColorTests: XCTestCase {
@@ -23,5 +24,18 @@ class BackgroundColorTests: XCTestCase {
             return
         }
         XCTAssertEqual(color.alphaComponent, 0.5, accuracy: 0.01)
+    }
+
+    func testResizeRejectsInvalidDimensions() {
+        XCTAssertNil(NSImage(size: .zero).resize(maxSize: NSSize(width: 24, height: 24)))
+
+        let image = NSImage(size: NSSize(width: 24, height: 24))
+        XCTAssertNil(image.resize(maxSize: .zero))
+    }
+
+    func testResizeRejectsImageWithoutCGImage() {
+        let image = NSImage(size: NSSize(width: 24, height: 24))
+
+        XCTAssertNil(image.resize(maxSize: NSSize(width: 24, height: 24)))
     }
 }

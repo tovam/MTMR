@@ -9,8 +9,8 @@ class TimeTouchBarItem: CustomButtonTouchBarItem {
         if let locale = locale {
             dateFormatter.locale = Locale(identifier: locale)
         }
-        if let abbr = timeZone {
-            dateFormatter.timeZone = TimeZone(abbreviation: abbr)
+        if let timeZone {
+            dateFormatter.timeZone = TimeZone(identifier: timeZone) ?? TimeZone(abbreviation: timeZone)
         }
         super.init(identifier: identifier, title: " ")
         timer = Timer.scheduledTimer(timeInterval: 1, target: self, selector: #selector(updateTime), userInfo: nil, repeats: true)

@@ -1,8 +1,8 @@
 import Foundation
 
 class DarkModeBarItem: CustomButtonTouchBarItem, Widget {
-    static var name: String = "darkmode"
-    static var identifier: String = "com.toxblh.mtmr.darkmode"
+    static let name = "darkmode"
+    static let identifier = "com.tovam.MMTMR.darkMode."
 
     private var timer: Timer!
 
@@ -54,4 +54,3 @@ struct DarkMode {
 func runAppleScript(_ source: String) -> String? {
     return NSAppleScript(source: source)?.executeAndReturnError(nil).stringValue
 }
-

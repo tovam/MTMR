@@ -17,10 +17,11 @@ class GroupBarItem: NSPopoverTouchBarItem, NSTouchBarDelegate {
     var centerItems: [NSTouchBarItem] = []
     var rightIdentifiers: [NSTouchBarItem.Identifier] = []
     var scrollArea: NSCustomTouchBarItem?
-    var centerScrollArea = NSTouchBarItem.Identifier("com.toxblh.mtmr.scrollArea.".appending(UUID().uuidString))
+    var centerScrollArea: NSTouchBarItem.Identifier
 
     init(identifier: NSTouchBarItem.Identifier, items: [BarItemDefinition]) {
         jsonItems = items
+        centerScrollArea = NSTouchBarItem.Identifier(identifier.rawValue + ".scrollArea")
         super.init(identifier: identifier)
         popoverTouchBar.delegate = self
     }
@@ -35,6 +36,7 @@ class GroupBarItem: NSPopoverTouchBarItem, NSTouchBarDelegate {
         itemDefinitions = [:]
         items = [:]
         leftIdentifiers = []
+        centerIdentifiers = []
         centerItems = []
         rightIdentifiers = []
 
@@ -45,7 +47,6 @@ class GroupBarItem: NSPopoverTouchBarItem, NSTouchBarDelegate {
             items[identifier]
         })
 
-        centerScrollArea = NSTouchBarItem.Identifier("com.toxblh.mtmr.scrollArea.".appending(UUID().uuidString))
         scrollArea = ScrollViewItem(identifier: centerScrollArea, items: centerItems)
 
         TouchBarController.shared.touchBar.delegate = self
@@ -73,11 +74,9 @@ class GroupBarItem: NSPopoverTouchBarItem, NSTouchBarDelegate {
     }
 
     func loadItemDefinitions(jsonItems: [BarItemDefinition]) {
-        let dateFormatter = DateFormatter()
-        dateFormatter.dateFormat = "HH-mm-ss"
-        let time = dateFormatter.string(from: Date())
-        for item in jsonItems {
-            let identifierString = item.type.identifierBase.appending(time + "--" + UUID().uuidString)
+        for (index, item) in jsonItems.enumerated() {
+            let stableID = item.persistentID ?? "legacy-\(index)"
+            let identifierString = item.type.identifierBase.appending(stableID)
             let identifier = NSTouchBarItem.Identifier(identifierString)
             itemDefinitions[identifier] = item
             if item.align == .left {

@@ -227,7 +227,7 @@ class UpNextCalenderSource : IUpNextSource {
                 self.hasPermission = granted;
                 self.handleUpdate()
                 if(!granted) {
-                     NSLog("Error: MTMR UpNextBarWidget not given calendar access.")
+                     NSLog("Error: MMTMR UpNextBarWidget not given calendar access.")
                      return
                  }
             }

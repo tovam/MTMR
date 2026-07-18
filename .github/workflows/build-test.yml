@@ -1,22 +1,132 @@
-name: Build-and-test
+name: MMTMR build and test
 
-on: [push, pull_request]
+on:
+  workflow_dispatch:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mmtmr-ci-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  test:
-    runs-on: macOS-latest
+  build-test:
+    runs-on: macos-15
+    timeout-minutes: 45
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_26.3.app/Contents/Developer
+      CI_ROOT: ${{ github.workspace }}/build-checks/github-actions
+      DERIVED_DATA: ${{ github.workspace }}/build-checks/github-actions/DerivedData
+      SOURCE_PACKAGES: ${{ github.workspace }}/build-checks/github-actions/SourcePackages
+      PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}/build-checks/github-actions/playwright
 
     steps:
-      - uses: actions/checkout@v1
+      - name: Check out MMTMR
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
-      - name: Run tests
-        run: xcodebuild test -project MTMR.xcodeproj -scheme 'UnitTests' | xcpretty -c && exit ${PIPESTATUS[0]}
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
 
-  build:
-    runs-on: macOS-latest
+      - name: Show toolchain versions
+        run: |
+          xcodebuild -version
+          swift --version
+          node --version
+          npm --version
 
-    steps:
-      - uses: actions/checkout@v1
+      - name: Test and build the web editor
+        working-directory: Web
+        run: |
+          npm ci --cache "$CI_ROOT/npm-cache" --prefer-offline --no-audit
+          npm test
+          npm run build
 
-      - name: Build
-        run: xcodebuild archive -project "MTMR.xcodeproj" -scheme "MTMR" -archivePath Release/App.xcarchive DEVELOPMENT_TEAM="" CODE_SIGN_IDENTITY="" | xcpretty -c && exit ${PIPESTATUS[0]}
+      - name: Test the editor layout in Chromium and WebKit
+        working-directory: Web
+        run: |
+          npx playwright install chromium webkit
+          npm run test:e2e
+
+      - name: Resolve Swift packages
+        run: |
+          mkdir -p "$CI_ROOT"
+          xcodebuild -resolvePackageDependencies \
+            -project MTMR.xcodeproj \
+            -scheme MMTMR \
+            -clonedSourcePackagesDirPath "$SOURCE_PACKAGES" \
+            -onlyUsePackageVersionsFromResolvedFile
+
+      - name: Run Swift tests
+        run: |
+          xcodebuild test \
+            -project MTMR.xcodeproj \
+            -scheme MMTMR \
+            -configuration Debug \
+            -destination "platform=macOS" \
+            -derivedDataPath "$DERIVED_DATA" \
+            -clonedSourcePackagesDirPath "$SOURCE_PACKAGES" \
+            -resultBundlePath "$CI_ROOT/MMTMRTests.xcresult" \
+            -onlyUsePackageVersionsFromResolvedFile \
+            -disableAutomaticPackageResolution \
+            DEVELOPMENT_TEAM="" \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO
+
+      - name: Archive the unsigned application
+        run: |
+          xcodebuild archive \
+            -project MTMR.xcodeproj \
+            -scheme MMTMR \
+            -configuration Release \
+            -derivedDataPath "$DERIVED_DATA" \
+            -clonedSourcePackagesDirPath "$SOURCE_PACKAGES" \
+            -archivePath "$CI_ROOT/MMTMR.xcarchive" \
+            -onlyUsePackageVersionsFromResolvedFile \
+            -disableAutomaticPackageResolution \
+            DEVELOPMENT_TEAM="" \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO
+
+      - name: Verify the application archive
+        run: |
+          APP_PATH="$CI_ROOT/MMTMR.xcarchive/Products/Applications/MMTMR.app"
+          test -x "$APP_PATH/Contents/MacOS/MMTMR"
+          test -f "$APP_PATH/Contents/Resources/Editor/index.html"
+          test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$APP_PATH/Contents/Info.plist")" = "com.tovam.MMTMR"
+          codesign --force --deep --sign - "$APP_PATH"
+          codesign --verify --deep --strict --verbose=2 "$APP_PATH"
+
+      - name: Package the application artifact
+        run: |
+          ditto -c -k --sequesterRsrc --keepParent \
+            "$CI_ROOT/MMTMR.xcarchive/Products/Applications/MMTMR.app" \
+            "$CI_ROOT/MMTMR-unsigned.zip"
+
+      - name: Upload the application
+        uses: actions/upload-artifact@v4
+        with:
+          name: MMTMR-unsigned-${{ github.sha }}
+          path: ${{ env.CI_ROOT }}/MMTMR-unsigned.zip
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload test results on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: MMTMR-test-results-${{ github.sha }}
+          path: |
+            ${{ env.CI_ROOT }}/MMTMRTests.xcresult
+            Web/test-results
+            Web/playwright-report
+          if-no-files-found: ignore
+          retention-days: 7

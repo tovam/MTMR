@@ -8,83 +8,93 @@
 
 import Cocoa
 
-struct ExactItem {
-    let identifier: NSTouchBarItem.Identifier
-    let presetItem: BarItemDefinition
+struct RuntimeBarItem {
+    let id: String
+    let sourcePath: String
+    let fingerprint: String
+    let definition: BarItemDefinition
 }
 
-let appSupportDirectoryName = "MTMR tovam"
-let appSupportDirectory = NSSearchPathForDirectoriesInDomains(.applicationSupportDirectory, .userDomainMask, true).first!.appending("/\(appSupportDirectoryName)")
-let standardConfigPath = appSupportDirectory.appending("/items.json")
+struct RuntimeBarGeometry: Sendable {
+    let id: String
+    let align: String
+    let width: Double
+    let visible: Bool
+}
 
 extension ItemType {
     var identifierBase: String {
         switch self {
         case .staticButton(title: _):
-            return "com.toxblh.mtmr.staticButton."
-        case .appleScriptTitledButton(source: _):
-            return "com.toxblh.mtmr.appleScriptButton."
-        case .shellScriptTitledButton(source: _):
-            return "com.toxblh.mtmr.shellScriptButton."
+            return "com.tovam.MMTMR.staticButton."
+        case .appleScriptTitledButton(source: _, refreshInterval: _, alternativeImages: _):
+            return "com.tovam.MMTMR.appleScriptButton."
+        case .shellScriptTitledButton(source: _, refreshInterval: _):
+            return "com.tovam.MMTMR.shellScriptButton."
         case .timeButton(formatTemplate: _, timeZone: _, locale: _):
-            return "com.toxblh.mtmr.timeButton."
+            return "com.tovam.MMTMR.timeButton."
         case .battery:
-            return "com.toxblh.mtmr.battery."
+            return "com.tovam.MMTMR.battery."
         case .cpu(refreshInterval: _):
-            return "com.toxblh.mtmr.cpu."
+            return "com.tovam.MMTMR.cpu."
         case .dock(autoResize: _, filter: _):
-            return "com.toxblh.mtmr.dock"
+            return "com.tovam.MMTMR.dock"
         case .volume:
-            return "com.toxblh.mtmr.volume"
+            return "com.tovam.MMTMR.volume"
         case .brightness(refreshInterval: _):
-            return "com.toxblh.mtmr.brightness"
+            return "com.tovam.MMTMR.brightness"
         case .weather(interval: _, units: _, api_key: _, icon_type: _):
-            return "com.toxblh.mtmr.weather"
+            return "com.tovam.MMTMR.weather"
         case .yandexWeather(interval: _):
-            return "com.toxblh.mtmr.yandexWeather"
+            return "com.tovam.MMTMR.yandexWeather"
         case .currency(interval: _, from: _, to: _, full: _):
-            return "com.toxblh.mtmr.currency"
+            return "com.tovam.MMTMR.currency"
         case .inputsource:
-            return "com.toxblh.mtmr.inputsource."
-        case .music(interval: _):
-            return "com.toxblh.mtmr.music."
+            return "com.tovam.MMTMR.inputsource."
+        case .music(interval: _, disableMarquee: _):
+            return "com.tovam.MMTMR.music."
         case .group(items: _):
-            return "com.toxblh.mtmr.groupBar."
+            return "com.tovam.MMTMR.groupBar."
         case .nightShift:
-            return "com.toxblh.mtmr.nightShift."
+            return "com.tovam.MMTMR.nightShift."
         case .dnd:
-            return "com.toxblh.mtmr.dnd."
-        case .pomodoro(interval: _):
-            return PomodoroBarItem.identifier
-        case .network(flip: _):
-            return NetworkBarItem.identifier
+            return "com.tovam.MMTMR.dnd."
+        case .pomodoro(workTime: _, restTime: _):
+            return "com.tovam.MMTMR.pomodoro."
+        case .network(flip: _, units: _):
+            return "com.tovam.MMTMR.network."
         case .darkMode:
-            return DarkModeBarItem.identifier
+            return "com.tovam.MMTMR.darkMode."
         case .swipe(direction: _, fingers: _, minOffset: _, sourceApple: _, sourceBash: _):
-            return "com.toxblh.mtmr.swipe."
-        case .upnext(from: _, to: _, maxToShow: _, autoResize: _):
+            return "com.tovam.MMTMR.swipe."
+        case .upnext(interval: _, from: _, to: _, maxToShow: _, autoResize: _):
             return "com.connorgmeehan.mtmrup.next."
         }
     }
 }
 
 extension NSTouchBarItem.Identifier {
-    static let controlStripItem = NSTouchBarItem.Identifier("com.toxblh.mtmr.controlStrip")
+    static let controlStripItem = NSTouchBarItem.Identifier("com.tovam.MMTMR.controlStrip")
 }
 
+@MainActor
 class TouchBarController: NSObject, NSTouchBarDelegate {
     static let shared = TouchBarController()
 
     var touchBar: NSTouchBar!
 
-    fileprivate var lastPresetPath = ""
     var jsonItems: [BarItemDefinition] = []
     var itemDefinitions: [NSTouchBarItem.Identifier: BarItemDefinition] = [:]
+    private var definitionFingerprints: [NSTouchBarItem.Identifier: String] = [:]
+    private var definitionIDs: [NSTouchBarItem.Identifier: String] = [:]
+    private var renderedFingerprints: [NSTouchBarItem.Identifier: String] = [:]
+    private var renderedOrder: [NSTouchBarItem.Identifier] = []
     var items: [NSTouchBarItem.Identifier: NSTouchBarItem] = [:]
     var leftIdentifiers: [NSTouchBarItem.Identifier] = []
     var centerIdentifiers: [NSTouchBarItem.Identifier] = []
     var rightIdentifiers: [NSTouchBarItem.Identifier] = []
-    var basicViewIdentifier = NSTouchBarItem.Identifier("com.toxblh.mtmr.scrollView.".appending(UUID().uuidString))
+    let basicViewIdentifier = NSTouchBarItem.Identifier("com.tovam.MMTMR.scrollView")
+    private let centerScrollAreaIdentifier = NSTouchBarItem.Identifier("com.tovam.MMTMR.scrollArea")
     var basicView: BasicView?
     var swipeItems: [SwipeItem] = []
 
@@ -110,8 +120,7 @@ class TouchBarController: NSObject, NSTouchBarDelegate {
                 item: .staticButton(title: ""),
                 actions: [
                     Action(trigger: .singleTap, value: .custom(closure: { [weak self] in
-                        guard let `self` = self else { return }
-                        self.reloadPreset(path: self.lastPresetPath)
+                        self?.restoreRootPreset()
                     }))
                 ],
                 legacyAction: .none,
@@ -125,53 +134,60 @@ class TouchBarController: NSObject, NSTouchBarDelegate {
         NSWorkspace.shared.notificationCenter.addObserver(self, selector: #selector(activeApplicationChanged), name: NSWorkspace.didTerminateApplicationNotification, object: nil)
         NSWorkspace.shared.notificationCenter.addObserver(self, selector: #selector(activeApplicationChanged), name: NSWorkspace.didActivateApplicationNotification, object: nil)
 
-        reloadStandardConfig()
     }
 
     func createAndUpdatePreset(newJsonItems: [BarItemDefinition]) {
-        if let oldBar = self.touchBar {
-            minimizeSystemModal(oldBar)
+        let runtimeItems = newJsonItems.enumerated().map { index, definition in
+            RuntimeBarItem(
+                id: "legacy-\(index)",
+                sourcePath: "$[\(index)]",
+                fingerprint: "legacy-\(index)-\(String(describing: definition.type))",
+                definition: definition
+            )
         }
-        touchBar = NSTouchBar()
-        jsonItems = newJsonItems
-        itemDefinitions = [:]
+        apply(runtimeItems: runtimeItems)
+    }
 
-        loadItemDefinitions(jsonItems: jsonItems)
+    func apply(runtimeItems: [RuntimeBarItem]) {
+        if touchBar == nil {
+            touchBar = NSTouchBar()
+        }
+        touchBar.delegate = self
+        touchBar.defaultItemIdentifiers = [basicViewIdentifier]
+
+        jsonItems = runtimeItems.map(\.definition)
+        itemDefinitions = [:]
+        definitionFingerprints = [:]
+        definitionIDs = [:]
+
+        loadItemDefinitions(runtimeItems: runtimeItems)
         
         updateActiveApp()
     }
     
     func didItemsChange(prevItems: [NSTouchBarItem.Identifier: NSTouchBarItem], prevSwipeItems: [SwipeItem]) -> Bool {
-        var changed = items.count != prevItems.count || swipeItems.count != prevSwipeItems.count
-        
-        if !changed {
-            for (item, prevItem) in zip(items, prevItems) {
-                if item.key != prevItem.key {
-                    changed = true
-                    break
-                }
-            }
+        if Set(items.keys) != Set(prevItems.keys) {
+            return true
         }
 
-        if !changed {
-            for (swipeItem, prevSwipeItem) in zip(swipeItems, prevSwipeItems) {
-                if !swipeItem.isEqual(prevSwipeItem) {
-                    changed = true
-                    break
-                }
-            }
-        }
-
-        return changed
+        return swipeItems.map(\.identifier) != prevSwipeItems.map(\.identifier)
     }
     
     func prepareTouchBar() {
+        guard touchBar != nil else { return }
+
         let prevItems = items
         let prevSwipeItems = swipeItems
+        let previousFingerprints = renderedFingerprints
+        let previousOrder = renderedOrder
 
         createItems()
 
-        let changed = didItemsChange(prevItems: prevItems, prevSwipeItems: prevSwipeItems)
+        let newOrder = leftIdentifiers + centerIdentifiers + rightIdentifiers
+        let changed = previousOrder != newOrder
+            || previousFingerprints != renderedFingerprints
+            || didItemsChange(prevItems: prevItems, prevSwipeItems: prevSwipeItems)
+        renderedOrder = newOrder
 
         if !changed {
             return
@@ -181,13 +197,7 @@ class TouchBarController: NSObject, NSTouchBarDelegate {
             items[identifier]
         })
 
-        let centerScrollArea = NSTouchBarItem.Identifier("com.toxblh.mtmr.scrollArea.".appending(UUID().uuidString))
-        let scrollArea = ScrollViewItem(identifier: centerScrollArea, items: centerItems)
-        
-        basicViewIdentifier = NSTouchBarItem.Identifier("com.toxblh.mtmr.scrollView.".appending(UUID().uuidString))
-
-        touchBar.delegate = self
-        touchBar.defaultItemIdentifiers = [basicViewIdentifier]
+        let scrollArea = ScrollViewItem(identifier: centerScrollAreaIdentifier, items: centerItems)
 
         let leftItems = leftIdentifiers.compactMap({ (identifier) -> NSTouchBarItem? in
             items[identifier]
@@ -196,7 +206,12 @@ class TouchBarController: NSObject, NSTouchBarDelegate {
             items[identifier]
         })
 
-        basicView = BasicView(identifier: basicViewIdentifier, items:leftItems + [scrollArea] + rightItems, swipeItems: swipeItems)
+        let visibleItems = leftItems + [scrollArea] + rightItems
+        if let basicView {
+            basicView.update(items: visibleItems, swipeItems: swipeItems)
+        } else {
+            basicView = BasicView(identifier: basicViewIdentifier, items: visibleItems, swipeItems: swipeItems)
+        }
         basicView?.legacyGesturesEnabled = AppSettings.multitouchGestures
     }
 
@@ -221,31 +236,25 @@ class TouchBarController: NSObject, NSTouchBarDelegate {
         return items.count != 0 || swipeItems.count != 0
     }
 
-    func reloadStandardConfig() {
-        let presetPath = standardConfigPath
-        if !FileManager.default.fileExists(atPath: presetPath),
-            let defaultPreset = Bundle.main.path(forResource: "defaultPreset", ofType: "json") {
-            try? FileManager.default.createDirectory(atPath: appSupportDirectory, withIntermediateDirectories: true, attributes: nil)
-            try? FileManager.default.copyItem(atPath: defaultPreset, toPath: presetPath)
-        }
-
-        reloadPreset(path: presetPath)
+    func restoreRootPreset() {
+        guard touchBar != nil else { return }
+        touchBar.delegate = self
+        touchBar.defaultItemIdentifiers = [basicViewIdentifier]
+        updateActiveApp()
     }
 
-    func reloadPreset(path: String) {
-        lastPresetPath = path
-        let items = path.fileData?.barItemDefinitions() ?? [BarItemDefinition(type: .staticButton(title: "bad preset"), actions: [], action: .none, legacyLongAction: .none, additionalParameters: [:])]
-        createAndUpdatePreset(newJsonItems: items)
-    }
+    func loadItemDefinitions(runtimeItems: [RuntimeBarItem]) {
+        leftIdentifiers = []
+        centerIdentifiers = []
+        rightIdentifiers = []
 
-    func loadItemDefinitions(jsonItems: [BarItemDefinition]) {
-        let dateFormatter = DateFormatter()
-        dateFormatter.dateFormat = "HH-mm-ss"
-        let time = dateFormatter.string(from: Date())
-        for item in jsonItems {
-            let identifierString = item.type.identifierBase.appending(time + "--" + UUID().uuidString)
+        for runtimeItem in runtimeItems {
+            let item = runtimeItem.definition
+            let identifierString = item.type.identifierBase.appending(runtimeItem.id)
             let identifier = NSTouchBarItem.Identifier(identifierString)
             itemDefinitions[identifier] = item
+            definitionFingerprints[identifier] = runtimeItem.fingerprint
+            definitionIDs[identifier] = runtimeItem.id
             if item.align == .left {
                 leftIdentifiers.append(identifier)
             }
@@ -259,16 +268,23 @@ class TouchBarController: NSObject, NSTouchBarDelegate {
     }
 
     func createItems() {
-        items = [:]
-        swipeItems = []
+        let previousItems = items
+        let previousSwipeItems = Dictionary(uniqueKeysWithValues: swipeItems.map { ($0.identifier, $0) })
+        var nextItems: [NSTouchBarItem.Identifier: NSTouchBarItem] = [:]
+        var nextSwipeItems: [SwipeItem] = []
 
-        for (identifier, definition) in itemDefinitions {
+        for identifier in leftIdentifiers + centerIdentifiers + rightIdentifiers {
+            guard let definition = itemDefinitions[identifier] else { continue }
             var show = true
             
             if let frontApp = frontmostApplicationIdentifier {
                 if case let .matchAppId(regexString)? = definition.additionalParameters[.matchAppId] {
-                    let regex = try! NSRegularExpression(pattern: regexString)
-                    let range = NSRange(location: 0, length: frontApp.count)
+                    guard let regex = try? NSRegularExpression(pattern: regexString) else {
+                        // The strict validator rejects malformed expressions. Keep
+                        // this defensive check for legacy in-process definitions.
+                        continue
+                    }
+                    let range = NSRange(frontApp.startIndex..<frontApp.endIndex, in: frontApp)
                     if regex.firstMatch(in: frontApp, range: range) == nil {
                         show = false
                     }
@@ -276,13 +292,38 @@ class TouchBarController: NSObject, NSTouchBarDelegate {
             }
             
             if show {
-                let item = createItem(forIdentifier: identifier, definition: definition)
-                if item is SwipeItem {
-                    swipeItems.append(item as! SwipeItem)
+                let item: NSTouchBarItem?
+                let previousItem = previousItems[identifier] ?? previousSwipeItems[identifier]
+                if renderedFingerprints[identifier] == definitionFingerprints[identifier],
+                   let previousItem {
+                    item = previousItem
                 } else {
-                    items[identifier] = item
+                    item = createItem(forIdentifier: identifier, definition: definition)
+                }
+                if item is SwipeItem {
+                    nextSwipeItems.append(item as! SwipeItem)
+                } else {
+                    nextItems[identifier] = item
                 }
             }
+        }
+
+        items = nextItems
+        swipeItems = nextSwipeItems
+        renderedFingerprints = definitionFingerprints
+    }
+
+    func runtimeGeometry() -> [RuntimeBarGeometry] {
+        (leftIdentifiers + centerIdentifiers + rightIdentifiers).compactMap { identifier in
+            guard let id = definitionIDs[identifier], let definition = itemDefinitions[identifier] else { return nil }
+            let item = items[identifier]
+            let width = item?.view?.fittingSize.width ?? item?.view?.frame.width ?? 0
+            return RuntimeBarGeometry(
+                id: id,
+                align: definition.align.rawValue,
+                width: Double(width),
+                visible: item != nil
+            )
         }
     }
 
@@ -389,8 +430,8 @@ class TouchBarController: NSObject, NSTouchBarDelegate {
             barItem = DarkModeBarItem(identifier: identifier)
         case let .swipe(direction: direction, fingers: fingers, minOffset: minOffset, sourceApple: sourceApple, sourceBash: sourceBash):
             barItem = SwipeItem(identifier: identifier, direction: direction, fingers: fingers, minOffset: minOffset, sourceApple: sourceApple, sourceBash: sourceBash)
-        case let .upnext(from: from, to: to, maxToShow: maxToShow, autoResize: autoResize):
-            barItem = UpNextScrubberTouchBarItem(identifier: identifier, interval: 60, from: from, to: to, maxToShow: maxToShow, autoResize: autoResize)
+        case let .upnext(interval: interval, from: from, to: to, maxToShow: maxToShow, autoResize: autoResize):
+            barItem = UpNextScrubberTouchBarItem(identifier: identifier, interval: interval, from: from, to: to, maxToShow: maxToShow, autoResize: autoResize)
         }
 
         if let action = self.action(forItem: item), let item = barItem as? CustomButtonTouchBarItem {
@@ -433,6 +474,8 @@ class TouchBarController: NSObject, NSTouchBarDelegate {
             return { HIDPostAuxKey(keycode) }
         case let .keyPress(keycode: keycode):
             return { GenericKeyPress(keyCode: CGKeyCode(keycode)).send() }
+        case let .typeText(text: text):
+            return { UnicodeTextInput(text: text).send() }
         case let .appleScript(source: source):
             guard let appleScript = source.appleScript else {
                 print("cannot create apple script for item \(action)")
@@ -558,6 +601,7 @@ class TouchBarController: NSObject, NSTouchBarDelegate {
     }
 }
 
+@MainActor
 protocol CanSetWidth {
     func setWidth(value: CGFloat)
 }

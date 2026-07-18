@@ -9,8 +9,8 @@
 import Foundation
 
 class NetworkBarItem: CustomButtonTouchBarItem, Widget {
-    static var name: String = "network"
-    static var identifier: String = "com.toxblh.mtmr.network"
+    static let name = "network"
+    static let identifier = "com.tovam.MMTMR.network."
     
     private let flip: Bool
     private let units: String
@@ -27,63 +27,43 @@ class NetworkBarItem: CustomButtonTouchBarItem, Widget {
     }
 
     func startMonitoringProcess() {
-        var pipe: Pipe
-        var outputHandle: FileHandle
-        var bandwidthProcess: Process?
-        var dSpeed: UInt64?
-        var uSpeed: UInt64?
-        var curr: Array<Substring>?
-        var dataAvailable: NSObjectProtocol?
+        let pipe = Pipe()
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
+        process.arguments = ["netstat", "-w1", "-l", "en0"]
+        process.standardOutput = pipe
 
-        pipe = Pipe()
-        bandwidthProcess = Process()
-        bandwidthProcess?.launchPath = "/usr/bin/env"
-        bandwidthProcess?.arguments = ["netstat", "-w1", "-l", "en0"]
-        bandwidthProcess?.standardOutput = pipe
+        let outputHandle = pipe.fileHandleForReading
+        outputHandle.readabilityHandler = { [weak self] handle in
+            let data = handle.availableData
+            guard !data.isEmpty else {
+                handle.readabilityHandler = nil
+                return
+            }
+            guard let string = String(data: data, encoding: .utf8) else { return }
+            let columns = string
+                .replacingOccurrences(of: "  ", with: " ")
+                .split(separator: " ")
+            guard columns.count >= 6,
+                  let download = UInt64(columns[2]),
+                  let upload = UInt64(columns[5])
+            else { return }
 
-        outputHandle = pipe.fileHandleForReading
-        outputHandle.waitForDataInBackgroundAndNotify(forModes: [RunLoop.Mode.common])
-
-        dataAvailable = NotificationCenter.default.addObserver(
-            forName: NSNotification.Name.NSFileHandleDataAvailable,
-            object: outputHandle,
-            queue: nil
-        ) { _ -> Void in
-            let data = pipe.fileHandleForReading.availableData
-            if data.count > 0 {
-                if let str = NSString(data: data, encoding: String.Encoding.utf8.rawValue) {
-                    curr = [""]
-                    curr = str
-                        .replacingOccurrences(of: "  ", with: " ")
-                        .split(separator: " ")
-                    if curr == nil || (curr?.count)! < 6 {} else {
-                        if Int64(curr![2]) == nil {} else {
-                            dSpeed = UInt64(curr![2])
-                            uSpeed = UInt64(curr![5])
-
-                            self.setTitle(up: self.getHumanizeSize(speed: uSpeed!), down: self.getHumanizeSize(speed: dSpeed!))
-                        }
-                    }
-                }
-                outputHandle.waitForDataInBackgroundAndNotify()
-            } else if let dataAvailable = dataAvailable {
-                NotificationCenter.default.removeObserver(dataAvailable)
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                setTitle(
+                    up: getHumanizeSize(speed: upload),
+                    down: getHumanizeSize(speed: download)
+                )
             }
         }
 
-        var dataReady: NSObjectProtocol?
-        dataReady = NotificationCenter.default.addObserver(
-            forName: Process.didTerminateNotification,
-            object: outputHandle,
-            queue: nil
-        ) { _ -> Void in
-            print("Task terminated!")
-            if let observer = dataReady {
-                NotificationCenter.default.removeObserver(observer)
-            }
+        do {
+            try process.run()
+        } catch {
+            outputHandle.readabilityHandler = nil
+            print("Could not start network monitor: \(error)")
         }
-
-        bandwidthProcess?.launch()
     }
 
     func getHumanizeSize(speed: UInt64) -> String {

@@ -17,6 +17,29 @@ struct GenericKeyPress: KeyPress {
     var keyCode: CGKeyCode
 }
 
+struct UnicodeTextInput {
+    let text: String
+
+    func send() {
+        let codeUnits = Array(text.utf16)
+        guard !codeUnits.isEmpty else { return }
+
+        guard
+            let keyDown = CGEvent(keyboardEventSource: nil, virtualKey: 0, keyDown: true),
+            let keyUp = CGEvent(keyboardEventSource: nil, virtualKey: 0, keyDown: false)
+        else { return }
+
+        codeUnits.withUnsafeBufferPointer { buffer in
+            keyDown.keyboardSetUnicodeString(stringLength: buffer.count, unicodeString: buffer.baseAddress)
+            keyUp.keyboardSetUnicodeString(stringLength: buffer.count, unicodeString: buffer.baseAddress)
+
+            let location: CGEventTapLocation = .cghidEventTap
+            keyDown.post(tap: location)
+            keyUp.post(tap: location)
+        }
+    }
+}
+
 extension KeyPress {
     func send() {
         let src = CGEventSource(stateID: .hidSystemState)

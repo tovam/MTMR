@@ -42,6 +42,11 @@ playground.xcworkspace
 # Package.pins
 # Package.resolved
 .build/
+build-checks/
+
+# Local MTMR configuration files used during migration testing
+/items.json
+/items-back.json
 
 # CocoaPods
 #

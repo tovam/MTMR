@@ -38,14 +38,11 @@
 		60F7D454208CC31400ABF5D2 /* InputSourceBarItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 60F7D453208CC31400ABF5D2 /* InputSourceBarItem.swift */; };
 		B0008E552080286C003AD4DD /* SupportHelpers.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0008E542080286C003AD4DD /* SupportHelpers.swift */; };
 		B002E642216C0E38002774BA /* CoreDisplay.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = B002E641216C0E38002774BA /* CoreDisplay.framework */; };
-		B00D181D2152F4A5000806F4 /* Sparkle.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = B00D181C2152F4A5000806F4 /* Sparkle.framework */; };
-		B00D181F2152F521000806F4 /* Sparkle.framework in CopyFiles */ = {isa = PBXBuildFile; fileRef = B00D181C2152F4A5000806F4 /* Sparkle.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		B04B7BB72087398C00C835D0 /* BatteryBarItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = B04B7BB62087398C00C835D0 /* BatteryBarItem.swift */; };
 		B05600D32083E9BB00EB218D /* CustomSlider.swift in Sources */ = {isa = PBXBuildFile; fileRef = B05600D22083E9BB00EB218D /* CustomSlider.swift */; };
 		B059D622205E03F5006E6B86 /* TouchBarController.swift in Sources */ = {isa = PBXBuildFile; fileRef = B059D621205E03F5006E6B86 /* TouchBarController.swift */; };
 		B059D624205E04F3006E6B86 /* CustomButtonTouchBarItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = B059D623205E04F3006E6B86 /* CustomButtonTouchBarItem.swift */; };
 		B059D62D205F11E8006E6B86 /* DFRFoundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = B059D62C205F11E8006E6B86 /* DFRFoundation.framework */; };
-		B0679BC1215AE73F000FC6B4 /* dsa_pub.pem in Resources */ = {isa = PBXBuildFile; fileRef = B0679BC0215AE73F000FC6B4 /* dsa_pub.pem */; };
 		B08126EF217BD0B900A98970 /* PomodoroBarItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = B08126EE217BD0B900A98970 /* PomodoroBarItem.swift */; };
 		B08126F1217BE19000A98970 /* WidgetProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = B08126F0217BE19000A98970 /* WidgetProtocol.swift */; };
 		B08173272135F02B005D4908 /* NightShiftBarItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = B08173262135F02B005D4908 /* NightShiftBarItem.swift */; };
@@ -74,20 +71,59 @@
 		BAF5AB5724317B4300B04904 /* BasicView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BAF5AB5624317B4300B04904 /* BasicView.swift */; };
 		BAF5AB5924317CAF00B04904 /* SwipeItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = BAF5AB5824317CAF00B04904 /* SwipeItem.swift */; };
 		F29F6A2524BC7148004FF8E4 /* UpNextScrubberTouchBarItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = F29F6A2424BC7148004FF8E4 /* UpNextScrubberTouchBarItem.swift */; };
+		F10000000000000000000006 /* Hummingbird in Frameworks */ = {isa = PBXBuildFile; productRef = F10000000000000000000003 /* Hummingbird */; };
+		F10000000000000000000007 /* HummingbirdWebSocket in Frameworks */ = {isa = PBXBuildFile; productRef = F10000000000000000000004 /* HummingbirdWebSocket */; };
+		F10000000000000000000008 /* HummingbirdTesting in Frameworks */ = {isa = PBXBuildFile; productRef = F10000000000000000000005 /* HummingbirdTesting */; };
+		F10000000000000000000009 /* Hummingbird in Frameworks */ = {isa = PBXBuildFile; productRef = F10000000000000000000003 /* Hummingbird */; };
+		F1000000000000000000000A /* HummingbirdWebSocket in Frameworks */ = {isa = PBXBuildFile; productRef = F10000000000000000000004 /* HummingbirdWebSocket */; };
+		F1000000000000000000000D /* ServiceLifecycle in Frameworks */ = {isa = PBXBuildFile; productRef = F1000000000000000000000C /* ServiceLifecycle */; };
+		F1000000000000000000000E /* ServiceLifecycle in Frameworks */ = {isa = PBXBuildFile; productRef = F1000000000000000000000C /* ServiceLifecycle */; };
+		F20100000000000000000001 /* ConfigCodec.swift in Sources */ = {isa = PBXBuildFile; fileRef = F20000000000000000000001 /* ConfigCodec.swift */; };
+		F20100000000000000000002 /* ConfigContentHasher.swift in Sources */ = {isa = PBXBuildFile; fileRef = F20000000000000000000002 /* ConfigContentHasher.swift */; };
+		F20100000000000000000003 /* ConfigDocument.swift in Sources */ = {isa = PBXBuildFile; fileRef = F20000000000000000000003 /* ConfigDocument.swift */; };
+		F20100000000000000000004 /* ConfigFileStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = F20000000000000000000004 /* ConfigFileStore.swift */; };
+		F20100000000000000000005 /* ConfigValidator.swift in Sources */ = {isa = PBXBuildFile; fileRef = F20000000000000000000005 /* ConfigValidator.swift */; };
+		F20100000000000000000006 /* ConfigurationBootstrapper.swift in Sources */ = {isa = PBXBuildFile; fileRef = F20000000000000000000006 /* ConfigurationBootstrapper.swift */; };
+		F20100000000000000000007 /* ConfigurationCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = F20000000000000000000007 /* ConfigurationCoordinator.swift */; };
+		F20100000000000000000008 /* ConfigurationDiagnostic.swift in Sources */ = {isa = PBXBuildFile; fileRef = F20000000000000000000008 /* ConfigurationDiagnostic.swift */; };
+		F20100000000000000000009 /* ConfigurationFileWatcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = F20000000000000000000009 /* ConfigurationFileWatcher.swift */; };
+		F2010000000000000000000A /* ConfigurationLocation.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2000000000000000000000A /* ConfigurationLocation.swift */; };
+		F2010000000000000000000B /* JSONValue.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2000000000000000000000B /* JSONValue.swift */; };
+		F2010000000000000000000C /* LegacyConfigMigrator.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2000000000000000000000C /* LegacyConfigMigrator.swift */; };
+		F2010000000000000000000D /* StrictJSONParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2000000000000000000000D /* StrictJSONParser.swift */; };
+		F20100000000000000000021 /* ServerModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = F20000000000000000000021 /* ServerModels.swift */; };
+		F20100000000000000000022 /* EditorAssetStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = F20000000000000000000022 /* EditorAssetStore.swift */; };
+		F20100000000000000000023 /* EditorServerSecurity.swift in Sources */ = {isa = PBXBuildFile; fileRef = F20000000000000000000023 /* EditorServerSecurity.swift */; };
+		F20100000000000000000024 /* EditorServerEventHub.swift in Sources */ = {isa = PBXBuildFile; fileRef = F20000000000000000000024 /* EditorServerEventHub.swift */; };
+		F20100000000000000000025 /* EditorServerController.swift in Sources */ = {isa = PBXBuildFile; fileRef = F20000000000000000000025 /* EditorServerController.swift */; };
+		F20100000000000000000026 /* MMTMREditorServer.swift in Sources */ = {isa = PBXBuildFile; fileRef = F20000000000000000000026 /* MMTMREditorServer.swift */; };
+		F20100000000000000000031 /* ConfigurationServerAdapter.swift in Sources */ = {isa = PBXBuildFile; fileRef = F20000000000000000000031 /* ConfigurationServerAdapter.swift */; };
+		F20100000000000000000032 /* MMTMRConfigurationSchema.swift in Sources */ = {isa = PBXBuildFile; fileRef = F20000000000000000000032 /* MMTMRConfigurationSchema.swift */; };
+		F20200000000000000000001 /* ConfigCodec.swift in Sources */ = {isa = PBXBuildFile; fileRef = F20000000000000000000001 /* ConfigCodec.swift */; };
+		F20200000000000000000002 /* ConfigContentHasher.swift in Sources */ = {isa = PBXBuildFile; fileRef = F20000000000000000000002 /* ConfigContentHasher.swift */; };
+		F20200000000000000000003 /* ConfigDocument.swift in Sources */ = {isa = PBXBuildFile; fileRef = F20000000000000000000003 /* ConfigDocument.swift */; };
+		F20200000000000000000004 /* ConfigFileStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = F20000000000000000000004 /* ConfigFileStore.swift */; };
+		F20200000000000000000005 /* ConfigValidator.swift in Sources */ = {isa = PBXBuildFile; fileRef = F20000000000000000000005 /* ConfigValidator.swift */; };
+		F20200000000000000000006 /* ConfigurationBootstrapper.swift in Sources */ = {isa = PBXBuildFile; fileRef = F20000000000000000000006 /* ConfigurationBootstrapper.swift */; };
+		F20200000000000000000007 /* ConfigurationCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = F20000000000000000000007 /* ConfigurationCoordinator.swift */; };
+		F20200000000000000000008 /* ConfigurationDiagnostic.swift in Sources */ = {isa = PBXBuildFile; fileRef = F20000000000000000000008 /* ConfigurationDiagnostic.swift */; };
+		F20200000000000000000009 /* ConfigurationFileWatcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = F20000000000000000000009 /* ConfigurationFileWatcher.swift */; };
+		F2020000000000000000000A /* ConfigurationLocation.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2000000000000000000000A /* ConfigurationLocation.swift */; };
+		F2020000000000000000000B /* JSONValue.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2000000000000000000000B /* JSONValue.swift */; };
+		F2020000000000000000000C /* LegacyConfigMigrator.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2000000000000000000000C /* LegacyConfigMigrator.swift */; };
+		F2020000000000000000000D /* StrictJSONParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2000000000000000000000D /* StrictJSONParser.swift */; };
+		F20200000000000000000021 /* ServerModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = F20000000000000000000021 /* ServerModels.swift */; };
+		F20200000000000000000022 /* EditorAssetStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = F20000000000000000000022 /* EditorAssetStore.swift */; };
+		F20200000000000000000023 /* EditorServerSecurity.swift in Sources */ = {isa = PBXBuildFile; fileRef = F20000000000000000000023 /* EditorServerSecurity.swift */; };
+		F20200000000000000000024 /* EditorServerEventHub.swift in Sources */ = {isa = PBXBuildFile; fileRef = F20000000000000000000024 /* EditorServerEventHub.swift */; };
+		F20200000000000000000025 /* EditorServerController.swift in Sources */ = {isa = PBXBuildFile; fileRef = F20000000000000000000025 /* EditorServerController.swift */; };
+		F20200000000000000000026 /* MMTMREditorServer.swift in Sources */ = {isa = PBXBuildFile; fileRef = F20000000000000000000026 /* MMTMREditorServer.swift */; };
+		F20200000000000000000031 /* ConfigurationServerAdapter.swift in Sources */ = {isa = PBXBuildFile; fileRef = F20000000000000000000031 /* ConfigurationServerAdapter.swift */; };
+		F20200000000000000000032 /* MMTMRConfigurationSchema.swift in Sources */ = {isa = PBXBuildFile; fileRef = F20000000000000000000032 /* MMTMRConfigurationSchema.swift */; };
+		F20200000000000000000041 /* ConfigurationCoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F20000000000000000000041 /* ConfigurationCoreTests.swift */; };
+		F20200000000000000000042 /* MMTMREditorServerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F20000000000000000000042 /* MMTMREditorServerTests.swift */; };
+		F20200000000000000000043 /* MMTMREditorServerNetworkTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F20000000000000000000043 /* MMTMREditorServerNetworkTests.swift */; };
 /* End PBXBuildFile section */
-
-/* Begin PBXCopyFilesBuildPhase section */
-		B00D181E2152F507000806F4 /* CopyFiles */ = {
-			isa = PBXCopyFilesBuildPhase;
-			buildActionMask = 12;
-			dstPath = "";
-			dstSubfolderSpec = 10;
-			files = (
-				B00D181F2152F521000806F4 /* Sparkle.framework in CopyFiles */,
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		36300E85209FD16700B31C71 /* .travis.yml */ = {isa = PBXFileReference; lastKnownFileType = text; path = .travis.yml; sourceTree = SOURCE_ROOT; };
@@ -125,7 +161,6 @@
 		60F7D453208CC31400ABF5D2 /* InputSourceBarItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputSourceBarItem.swift; sourceTree = "<group>"; };
 		B0008E542080286C003AD4DD /* SupportHelpers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupportHelpers.swift; sourceTree = "<group>"; };
 		B002E641216C0E38002774BA /* CoreDisplay.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreDisplay.framework; path = ../../../../../System/Library/Frameworks/CoreDisplay.framework; sourceTree = "<group>"; };
-		B00D181C2152F4A5000806F4 /* Sparkle.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; path = Sparkle.framework; sourceTree = "<group>"; };
 		B04B7BB62087398C00C835D0 /* BatteryBarItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BatteryBarItem.swift; sourceTree = "<group>"; };
 		B05600D22083E9BB00EB218D /* CustomSlider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CustomSlider.swift; sourceTree = "<group>"; };
 		B059D621205E03F5006E6B86 /* TouchBarController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TouchBarController.swift; sourceTree = "<group>"; };
@@ -133,14 +168,13 @@
 		B059D629205E13E5006E6B86 /* TouchBarPrivateApi.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TouchBarPrivateApi.h; sourceTree = "<group>"; };
 		B059D62A205F0E7D006E6B86 /* TouchBarPrivateApi-Bridging.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "TouchBarPrivateApi-Bridging.h"; sourceTree = "<group>"; };
 		B059D62C205F11E8006E6B86 /* DFRFoundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = DFRFoundation.framework; path = ../../../../../System/Library/PrivateFrameworks/DFRFoundation.framework; sourceTree = "<group>"; };
-		B0679BC0215AE73F000FC6B4 /* dsa_pub.pem */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = dsa_pub.pem; sourceTree = "<group>"; };
 		B08126EE217BD0B900A98970 /* PomodoroBarItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PomodoroBarItem.swift; sourceTree = "<group>"; };
 		B08126F0217BE19000A98970 /* WidgetProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WidgetProtocol.swift; sourceTree = "<group>"; };
 		B08173262135F02B005D4908 /* NightShiftBarItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NightShiftBarItem.swift; sourceTree = "<group>"; };
 		B08173282135F128005D4908 /* CBBlueLightClient.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = CBBlueLightClient.h; sourceTree = "<group>"; };
 		B08173292135F354005D4908 /* CoreBrightness.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreBrightness.framework; path = ../../../../../System/Library/PrivateFrameworks/CoreBrightness.framework; sourceTree = "<group>"; };
 		B081732B213739FE005D4908 /* DnDBarItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DnDBarItem.swift; sourceTree = "<group>"; };
-		B082B24F205C7D8000BC04DC /* MTMR.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MTMR.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		B082B24F205C7D8000BC04DC /* MMTMR.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MMTMR.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		B082B252205C7D8000BC04DC /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		B082B256205C7D8000BC04DC /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		B082B259205C7D8000BC04DC /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/Main.storyboard; sourceTree = "<group>"; };
@@ -169,6 +203,30 @@
 		BAF5AB5624317B4300B04904 /* BasicView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BasicView.swift; sourceTree = "<group>"; };
 		BAF5AB5824317CAF00B04904 /* SwipeItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SwipeItem.swift; sourceTree = "<group>"; };
 		F29F6A2424BC7148004FF8E4 /* UpNextScrubberTouchBarItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpNextScrubberTouchBarItem.swift; sourceTree = "<group>"; };
+		F20000000000000000000001 /* ConfigCodec.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConfigCodec.swift; sourceTree = "<group>"; };
+		F20000000000000000000002 /* ConfigContentHasher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConfigContentHasher.swift; sourceTree = "<group>"; };
+		F20000000000000000000003 /* ConfigDocument.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConfigDocument.swift; sourceTree = "<group>"; };
+		F20000000000000000000004 /* ConfigFileStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConfigFileStore.swift; sourceTree = "<group>"; };
+		F20000000000000000000005 /* ConfigValidator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConfigValidator.swift; sourceTree = "<group>"; };
+		F20000000000000000000006 /* ConfigurationBootstrapper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConfigurationBootstrapper.swift; sourceTree = "<group>"; };
+		F20000000000000000000007 /* ConfigurationCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConfigurationCoordinator.swift; sourceTree = "<group>"; };
+		F20000000000000000000008 /* ConfigurationDiagnostic.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConfigurationDiagnostic.swift; sourceTree = "<group>"; };
+		F20000000000000000000009 /* ConfigurationFileWatcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConfigurationFileWatcher.swift; sourceTree = "<group>"; };
+		F2000000000000000000000A /* ConfigurationLocation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConfigurationLocation.swift; sourceTree = "<group>"; };
+		F2000000000000000000000B /* JSONValue.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JSONValue.swift; sourceTree = "<group>"; };
+		F2000000000000000000000C /* LegacyConfigMigrator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LegacyConfigMigrator.swift; sourceTree = "<group>"; };
+		F2000000000000000000000D /* StrictJSONParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StrictJSONParser.swift; sourceTree = "<group>"; };
+		F20000000000000000000021 /* ServerModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerModels.swift; sourceTree = "<group>"; };
+		F20000000000000000000022 /* EditorAssetStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditorAssetStore.swift; sourceTree = "<group>"; };
+		F20000000000000000000023 /* EditorServerSecurity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditorServerSecurity.swift; sourceTree = "<group>"; };
+		F20000000000000000000024 /* EditorServerEventHub.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditorServerEventHub.swift; sourceTree = "<group>"; };
+		F20000000000000000000025 /* EditorServerController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditorServerController.swift; sourceTree = "<group>"; };
+		F20000000000000000000026 /* MMTMREditorServer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MMTMREditorServer.swift; sourceTree = "<group>"; };
+		F20000000000000000000031 /* ConfigurationServerAdapter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConfigurationServerAdapter.swift; sourceTree = "<group>"; };
+		F20000000000000000000032 /* MMTMRConfigurationSchema.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MMTMRConfigurationSchema.swift; sourceTree = "<group>"; };
+		F20000000000000000000041 /* ConfigurationCoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConfigurationCoreTests.swift; sourceTree = "<group>"; };
+		F20000000000000000000042 /* MMTMREditorServerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MMTMREditorServerTests.swift; sourceTree = "<group>"; };
+		F20000000000000000000043 /* MMTMREditorServerNetworkTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MMTMREditorServerNetworkTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -176,11 +234,13 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				F1000000000000000000000D /* ServiceLifecycle in Frameworks */,
+				F10000000000000000000007 /* HummingbirdWebSocket in Frameworks */,
+				F10000000000000000000006 /* Hummingbird in Frameworks */,
 				B002E642216C0E38002774BA /* CoreDisplay.framework in Frameworks */,
 				B081732A2135F354005D4908 /* CoreBrightness.framework in Frameworks */,
 				B059D62D205F11E8006E6B86 /* DFRFoundation.framework in Frameworks */,
 				B09EB1E6207C0F8E00D5C1E0 /* MultitouchSupport.framework in Frameworks */,
-				B00D181D2152F4A5000806F4 /* Sparkle.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -188,6 +248,10 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				F1000000000000000000000E /* ServiceLifecycle in Frameworks */,
+				F1000000000000000000000A /* HummingbirdWebSocket in Frameworks */,
+				F10000000000000000000009 /* Hummingbird in Frameworks */,
+				F10000000000000000000008 /* HummingbirdTesting in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -198,7 +262,6 @@
 			isa = PBXGroup;
 			children = (
 				B002E641216C0E38002774BA /* CoreDisplay.framework */,
-				B00D181C2152F4A5000806F4 /* Sparkle.framework */,
 				B08173292135F354005D4908 /* CoreBrightness.framework */,
 				B09EB1E5207C0F8E00D5C1E0 /* MultitouchSupport.framework */,
 				B059D62C205F11E8006E6B86 /* DFRFoundation.framework */,
@@ -221,7 +284,7 @@
 		B082B250205C7D8000BC04DC /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				B082B24F205C7D8000BC04DC /* MTMR.app */,
+				B082B24F205C7D8000BC04DC /* MMTMR.app */,
 				B082B261205C7D8000BC04DC /* MTMRTests.xctest */,
 			);
 			name = Products;
@@ -230,13 +293,15 @@
 		B082B251205C7D8000BC04DC /* MTMR */ = {
 			isa = PBXGroup;
 			children = (
+				F200000000000000000000A1 /* Configuration */,
+				F200000000000000000000A2 /* Server */,
+				F200000000000000000000A3 /* Integration */,
 				B0B88A07208CD12000A2C160 /* Widgets */,
 				B0B1743B207D6ED40004B740 /* CBridge */,
 				B0B17426207D6AFE0004B740 /* AppleScripts */,
 				B082B256205C7D8000BC04DC /* Assets.xcassets */,
 				B082B258205C7D8000BC04DC /* Main.storyboard */,
 				B082B25B205C7D8000BC04DC /* Info.plist */,
-				B0679BC0215AE73F000FC6B4 /* dsa_pub.pem */,
 				B082B25C205C7D8000BC04DC /* MTMR.entitlements */,
 				36C2ECDF207CB1B0003CDA33 /* defaultPreset.json */,
 				B082B252205C7D8000BC04DC /* AppDelegate.swift */,
@@ -263,6 +328,9 @@
 		B082B264205C7D8000BC04DC /* MTMRTests */ = {
 			isa = PBXGroup;
 			children = (
+				F20000000000000000000043 /* MMTMREditorServerNetworkTests.swift */,
+				F20000000000000000000042 /* MMTMREditorServerTests.swift */,
+				F20000000000000000000041 /* ConfigurationCoreTests.swift */,
 				36300E85209FD16700B31C71 /* .travis.yml */,
 				36C2ECDC207C723B003CDA33 /* ParseConfigTests.swift */,
 				B082B267205C7D8000BC04DC /* Info.plist */,
@@ -335,26 +403,72 @@
 			path = Widgets;
 			sourceTree = "<group>";
 		};
+		F200000000000000000000A1 /* Configuration */ = {
+			isa = PBXGroup;
+			children = (
+				F20000000000000000000001 /* ConfigCodec.swift */,
+				F20000000000000000000002 /* ConfigContentHasher.swift */,
+				F20000000000000000000003 /* ConfigDocument.swift */,
+				F20000000000000000000004 /* ConfigFileStore.swift */,
+				F20000000000000000000005 /* ConfigValidator.swift */,
+				F20000000000000000000006 /* ConfigurationBootstrapper.swift */,
+				F20000000000000000000007 /* ConfigurationCoordinator.swift */,
+				F20000000000000000000008 /* ConfigurationDiagnostic.swift */,
+				F20000000000000000000009 /* ConfigurationFileWatcher.swift */,
+				F2000000000000000000000A /* ConfigurationLocation.swift */,
+				F2000000000000000000000B /* JSONValue.swift */,
+				F2000000000000000000000C /* LegacyConfigMigrator.swift */,
+				F2000000000000000000000D /* StrictJSONParser.swift */,
+			);
+			path = Configuration;
+			sourceTree = "<group>";
+		};
+		F200000000000000000000A2 /* Server */ = {
+			isa = PBXGroup;
+			children = (
+				F20000000000000000000021 /* ServerModels.swift */,
+				F20000000000000000000022 /* EditorAssetStore.swift */,
+				F20000000000000000000023 /* EditorServerSecurity.swift */,
+				F20000000000000000000024 /* EditorServerEventHub.swift */,
+				F20000000000000000000025 /* EditorServerController.swift */,
+				F20000000000000000000026 /* MMTMREditorServer.swift */,
+			);
+			path = Server;
+			sourceTree = "<group>";
+		};
+		F200000000000000000000A3 /* Integration */ = {
+			isa = PBXGroup;
+			children = (
+				F20000000000000000000031 /* ConfigurationServerAdapter.swift */,
+				F20000000000000000000032 /* MMTMRConfigurationSchema.swift */,
+			);
+			path = Integration;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		B082B24E205C7D8000BC04DC /* MTMR */ = {
+		B082B24E205C7D8000BC04DC /* MMTMR */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = B082B275205C7D8000BC04DC /* Build configuration list for PBXNativeTarget "MTMR" */;
+			buildConfigurationList = B082B275205C7D8000BC04DC /* Build configuration list for PBXNativeTarget "MMTMR" */;
 			buildPhases = (
 				B082B24B205C7D8000BC04DC /* Sources */,
 				B082B24C205C7D8000BC04DC /* Frameworks */,
 				B082B24D205C7D8000BC04DC /* Resources */,
-				B00D181E2152F507000806F4 /* CopyFiles */,
-				B0679BBF215AE085000FC6B4 /* ShellScript */,
+				B0679BBF215AE085000FC6B4 /* Build Web Editor */,
 			);
 			buildRules = (
 			);
 			dependencies = (
 			);
-			name = MTMR;
-			productName = MTMR;
-			productReference = B082B24F205C7D8000BC04DC /* MTMR.app */;
+			name = MMTMR;
+			productName = MMTMR;
+			packageProductDependencies = (
+				F10000000000000000000003 /* Hummingbird */,
+				F10000000000000000000004 /* HummingbirdWebSocket */,
+				F1000000000000000000000C /* ServiceLifecycle */,
+			);
+			productReference = B082B24F205C7D8000BC04DC /* MMTMR.app */;
 			productType = "com.apple.product-type.application";
 		};
 		B082B260205C7D8000BC04DC /* MTMRTests */ = {
@@ -371,6 +485,12 @@
 			);
 			name = MTMRTests;
 			productName = MTMRTests;
+			packageProductDependencies = (
+				F10000000000000000000003 /* Hummingbird */,
+				F10000000000000000000004 /* HummingbirdWebSocket */,
+				F10000000000000000000005 /* HummingbirdTesting */,
+				F1000000000000000000000C /* ServiceLifecycle */,
+			);
 			productReference = B082B261205C7D8000BC04DC /* MTMRTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
 		};
@@ -409,11 +529,16 @@
 				Base,
 			);
 			mainGroup = B082B246205C7D8000BC04DC;
+			packageReferences = (
+				F10000000000000000000001 /* XCRemoteSwiftPackageReference "hummingbird" */,
+				F10000000000000000000002 /* XCLocalSwiftPackageReference "hummingbird-websocket" */,
+				F1000000000000000000000B /* XCRemoteSwiftPackageReference "swift-service-lifecycle" */,
+			);
 			productRefGroup = B082B250205C7D8000BC04DC /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				B082B24E205C7D8000BC04DC /* MTMR */,
+				B082B24E205C7D8000BC04DC /* MMTMR */,
 				B082B260205C7D8000BC04DC /* MTMRTests */,
 			);
 		};
@@ -433,7 +558,6 @@
 				B0B17436207D6B590004B740 /* iTunes.next.scpt in Resources */,
 				B082B25A205C7D8000BC04DC /* Main.storyboard in Resources */,
 				B0B17435207D6B590004B740 /* Spotify.next.scpt in Resources */,
-				B0679BC1215AE73F000FC6B4 /* dsa_pub.pem in Resources */,
 				B0B17433207D6B590004B740 /* Finder.scpt in Resources */,
 				B0B17439207D6B590004B740 /* Vox.nowPlaying.scpt in Resources */,
 				B0B17438207D6B590004B740 /* Vox.next.scpt in Resources */,
@@ -453,8 +577,9 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXShellScriptBuildPhase section */
-		B0679BBF215AE085000FC6B4 /* ShellScript */ = {
+		B0679BBF215AE085000FC6B4 /* Build Web Editor */ = {
 			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
 			buildActionMask = 2147483647;
 			files = (
 			);
@@ -465,10 +590,12 @@
 			outputFileListPaths = (
 			);
 			outputPaths = (
+				"$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/Editor/index.html",
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "# Type a script or drag a script file from your workspace to insert its path.\nbuildNumber=$(/usr/libexec/PlistBuddy -c \"Print CFBundleVersion\" \"${PROJECT_DIR}/${INFOPLIST_FILE}\")\nbuildNumber=$(($buildNumber + 1))\n/usr/libexec/PlistBuddy -c \"Set :CFBundleVersion $buildNumber\" \"${PROJECT_DIR}/${INFOPLIST_FILE}\"\n";
+			shellScript = "set -eu\nexport PATH=\"/opt/homebrew/bin:/usr/local/bin:${PATH}\"\ncd \"${SRCROOT}/Web\"\nmkdir -p \"${SRCROOT}/build-checks/npm-cache\"\nnpm ci --cache \"${SRCROOT}/build-checks/npm-cache\" --prefer-offline --no-audit\nnpm run build\neditor_destination=\"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/Editor\"\nrm -rf \"${editor_destination}\"\nmkdir -p \"${editor_destination}\"\nditto dist \"${editor_destination}\"\n";
+			showEnvVarsInLog = 0;
 		};
 /* End PBXShellScriptBuildPhase section */
 
@@ -477,6 +604,27 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				F20100000000000000000032 /* MMTMRConfigurationSchema.swift in Sources */,
+				F20100000000000000000031 /* ConfigurationServerAdapter.swift in Sources */,
+				F20100000000000000000026 /* MMTMREditorServer.swift in Sources */,
+				F20100000000000000000025 /* EditorServerController.swift in Sources */,
+				F20100000000000000000024 /* EditorServerEventHub.swift in Sources */,
+				F20100000000000000000023 /* EditorServerSecurity.swift in Sources */,
+				F20100000000000000000022 /* EditorAssetStore.swift in Sources */,
+				F20100000000000000000021 /* ServerModels.swift in Sources */,
+				F2010000000000000000000D /* StrictJSONParser.swift in Sources */,
+				F2010000000000000000000C /* LegacyConfigMigrator.swift in Sources */,
+				F2010000000000000000000B /* JSONValue.swift in Sources */,
+				F2010000000000000000000A /* ConfigurationLocation.swift in Sources */,
+				F20100000000000000000009 /* ConfigurationFileWatcher.swift in Sources */,
+				F20100000000000000000008 /* ConfigurationDiagnostic.swift in Sources */,
+				F20100000000000000000007 /* ConfigurationCoordinator.swift in Sources */,
+				F20100000000000000000006 /* ConfigurationBootstrapper.swift in Sources */,
+				F20100000000000000000005 /* ConfigValidator.swift in Sources */,
+				F20100000000000000000004 /* ConfigFileStore.swift in Sources */,
+				F20100000000000000000003 /* ConfigDocument.swift in Sources */,
+				F20100000000000000000002 /* ConfigContentHasher.swift in Sources */,
+				F20100000000000000000001 /* ConfigCodec.swift in Sources */,
 				B059D622205E03F5006E6B86 /* TouchBarController.swift in Sources */,
 				B05600D32083E9BB00EB218D /* CustomSlider.swift in Sources */,
 				36C2ECD9207B74B4003CDA33 /* AppleScriptTouchBarItem.swift in Sources */,
@@ -524,6 +672,30 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				F20200000000000000000043 /* MMTMREditorServerNetworkTests.swift in Sources */,
+				F20200000000000000000042 /* MMTMREditorServerTests.swift in Sources */,
+				F20200000000000000000041 /* ConfigurationCoreTests.swift in Sources */,
+				F20200000000000000000032 /* MMTMRConfigurationSchema.swift in Sources */,
+				F20200000000000000000031 /* ConfigurationServerAdapter.swift in Sources */,
+				F20200000000000000000026 /* MMTMREditorServer.swift in Sources */,
+				F20200000000000000000025 /* EditorServerController.swift in Sources */,
+				F20200000000000000000024 /* EditorServerEventHub.swift in Sources */,
+				F20200000000000000000023 /* EditorServerSecurity.swift in Sources */,
+				F20200000000000000000022 /* EditorAssetStore.swift in Sources */,
+				F20200000000000000000021 /* ServerModels.swift in Sources */,
+				F2020000000000000000000D /* StrictJSONParser.swift in Sources */,
+				F2020000000000000000000C /* LegacyConfigMigrator.swift in Sources */,
+				F2020000000000000000000B /* JSONValue.swift in Sources */,
+				F2020000000000000000000A /* ConfigurationLocation.swift in Sources */,
+				F20200000000000000000009 /* ConfigurationFileWatcher.swift in Sources */,
+				F20200000000000000000008 /* ConfigurationDiagnostic.swift in Sources */,
+				F20200000000000000000007 /* ConfigurationCoordinator.swift in Sources */,
+				F20200000000000000000006 /* ConfigurationBootstrapper.swift in Sources */,
+				F20200000000000000000005 /* ConfigValidator.swift in Sources */,
+				F20200000000000000000004 /* ConfigFileStore.swift in Sources */,
+				F20200000000000000000003 /* ConfigDocument.swift in Sources */,
+				F20200000000000000000002 /* ConfigContentHasher.swift in Sources */,
+				F20200000000000000000001 /* ConfigCodec.swift in Sources */,
 				36300E9120A2D2B200B31C71 /* BackgroundColorTests.swift in Sources */,
 				36300E8F20A2CF3400B31C71 /* AppleScriptDefinitionTests.swift in Sources */,
 				36C2ECDD207C723B003CDA33 /* ParseConfigTests.swift in Sources */,
@@ -544,6 +716,55 @@
 			sourceTree = "<group>";
 		};
 /* End PBXVariantGroup section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		F10000000000000000000001 /* XCRemoteSwiftPackageReference "hummingbird" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/hummingbird-project/hummingbird.git";
+			requirement = {
+				kind = exactVersion;
+				version = 2.25.0;
+			};
+		};
+		F1000000000000000000000B /* XCRemoteSwiftPackageReference "swift-service-lifecycle" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/swift-server/swift-service-lifecycle.git";
+			requirement = {
+				kind = exactVersion;
+				version = 2.11.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		F10000000000000000000002 /* XCLocalSwiftPackageReference "hummingbird-websocket" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Vendor/hummingbird-websocket;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		F10000000000000000000003 /* Hummingbird */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = F10000000000000000000001 /* XCRemoteSwiftPackageReference "hummingbird" */;
+			productName = Hummingbird;
+		};
+		F10000000000000000000004 /* HummingbirdWebSocket */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = F10000000000000000000002 /* XCLocalSwiftPackageReference "hummingbird-websocket" */;
+			productName = HummingbirdWebSocket;
+		};
+		F10000000000000000000005 /* HummingbirdTesting */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = F10000000000000000000001 /* XCRemoteSwiftPackageReference "hummingbird" */;
+			productName = HummingbirdTesting;
+		};
+		F1000000000000000000000C /* ServiceLifecycle */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = F1000000000000000000000B /* XCRemoteSwiftPackageReference "swift-service-lifecycle" */;
+			productName = ServiceLifecycle;
+		};
+/* End XCSwiftPackageProductDependency section */
 
 /* Begin XCBuildConfiguration section */
 		B082B273205C7D8000BC04DC /* Debug */ = {
@@ -595,7 +816,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				MACOSX_DEPLOYMENT_TARGET = 10.12.2;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				MTL_ENABLE_DEBUG_INFO = YES;
 				ONLY_ACTIVE_ARCH = YES;
 				SDKROOT = macosx;
@@ -648,7 +869,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				MACOSX_DEPLOYMENT_TARGET = 10.12.2;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				SDKROOT = macosx;
 				SWIFT_OPTIMIZATION_LEVEL = "-Owholemodule";
@@ -668,11 +889,13 @@
 				);
 				INFOPLIST_FILE = MTMR/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks @loader_path/../Frameworks";
-				PRODUCT_BUNDLE_IDENTIFIER = com.tovam.MTMR;
-				PRODUCT_NAME = "MTMR tovam";
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.tovam.MMTMR;
+				PRODUCT_NAME = MMTMR;
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				SWIFT_OBJC_BRIDGING_HEADER = "MTMR/CBridge/TouchBarPrivateApi-Bridging.h";
-				SWIFT_VERSION = 5.0;
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_VERSION = 6.0;
 			};
 			name = Debug;
 		};
@@ -691,11 +914,13 @@
 				);
 				INFOPLIST_FILE = MTMR/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks @loader_path/../Frameworks";
-				PRODUCT_BUNDLE_IDENTIFIER = com.tovam.MTMR;
-				PRODUCT_NAME = "MTMR tovam";
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.tovam.MMTMR;
+				PRODUCT_NAME = MMTMR;
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				SWIFT_OBJC_BRIDGING_HEADER = "MTMR/CBridge/TouchBarPrivateApi-Bridging.h";
-				SWIFT_VERSION = 5.0;
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_VERSION = 6.0;
 			};
 			name = Release;
 		};
@@ -706,9 +931,11 @@
 				COMBINE_HIDPI_IMAGES = YES;
 				INFOPLIST_FILE = MTMRTests/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks @loader_path/../Frameworks";
-				PRODUCT_BUNDLE_IDENTIFIER = com.tovam.MTMRTests;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.tovam.MMTMRTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
-				SWIFT_VERSION = 5.0;
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_VERSION = 6.0;
 			};
 			name = Debug;
 		};
@@ -721,9 +948,11 @@
 				DEVELOPMENT_TEAM = "";
 				INFOPLIST_FILE = MTMRTests/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks @loader_path/../Frameworks";
-				PRODUCT_BUNDLE_IDENTIFIER = com.tovam.MTMRTests;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.tovam.MMTMRTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
-				SWIFT_VERSION = 5.0;
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_VERSION = 6.0;
 			};
 			name = Release;
 		};
@@ -739,7 +968,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		B082B275205C7D8000BC04DC /* Build configuration list for PBXNativeTarget "MTMR" */ = {
+		B082B275205C7D8000BC04DC /* Build configuration list for PBXNativeTarget "MMTMR" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				B082B276205C7D8000BC04DC /* Debug */,

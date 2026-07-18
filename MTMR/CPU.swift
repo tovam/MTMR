@@ -14,6 +14,7 @@ private let HOST_CPU_LOAD_INFO_COUNT      : mach_msg_type_number_t =
     UInt32(MemoryLayout<host_cpu_load_info_data_t>.size / MemoryLayout<integer_t>.size)
 
 /// CPU Class
+@MainActor
 public class CPU: NSObject {
     
     //--------------------------------------------------------------------------

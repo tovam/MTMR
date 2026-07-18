@@ -3,11 +3,13 @@ import Foundation
 
 extension Data {
     func barItemDefinitions() -> [BarItemDefinition]? {
-           return try! JSONDecoder().decode([BarItemDefinition].self, from: utf8string!.stripComments().data(using: .utf8)!)
+        try? JSONDecoder().decode([BarItemDefinition].self, from: self)
     }
 }
 
 struct BarItemDefinition: Decodable {
+    let persistentID: String?
+    let sourcePath: String?
     let type: ItemType
     let actions: [Action]
     let legacyAction: LegacyActionType
@@ -15,11 +17,15 @@ struct BarItemDefinition: Decodable {
     let additionalParameters: [GeneralParameters.CodingKeys: GeneralParameter]
 
     private enum CodingKeys: String, CodingKey {
+        case id
+        case sourcePath = "_sourcePath"
         case type
         case actions
     }
 
-    init(type: ItemType, actions: [Action], action: LegacyActionType, legacyLongAction: LegacyLongActionType, additionalParameters: [GeneralParameters.CodingKeys: GeneralParameter]) {
+    init(persistentID: String? = nil, sourcePath: String? = nil, type: ItemType, actions: [Action], action: LegacyActionType, legacyLongAction: LegacyLongActionType, additionalParameters: [GeneralParameters.CodingKeys: GeneralParameter]) {
+        self.persistentID = persistentID
+        self.sourcePath = sourcePath
         self.type = type
         self.actions = actions
         self.legacyAction = action
@@ -29,18 +35,24 @@ struct BarItemDefinition: Decodable {
 
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
+        let persistentID = try container.decodeIfPresent(String.self, forKey: .id)
+        let sourcePath = try container.decodeIfPresent(String.self, forKey: .sourcePath)
         let type = try container.decode(String.self, forKey: .type)
         let actions = try container.decodeIfPresent([Action].self, forKey: .actions)
         let parametersDecoder = SupportedTypesHolder.sharedInstance.lookup(by: type, actions: actions ?? [])
         var additionalParameters = try GeneralParameters(from: decoder).parameters
 
-        if let result = try? parametersDecoder(decoder),
-            case let (itemType, actions, action, longAction, parameters) = result {
-            parameters.forEach { additionalParameters[$0] = $1 }
-            self.init(type: itemType, actions: actions, action: action, legacyLongAction: longAction, additionalParameters: additionalParameters)
-        } else {
-            self.init(type: .staticButton(title: "unknown"), actions: [], action: .none, legacyLongAction: .none, additionalParameters: additionalParameters)
-        }
+        let result = try parametersDecoder(decoder)
+        result.parameters.forEach { additionalParameters[$0] = $1 }
+        self.init(
+            persistentID: persistentID,
+            sourcePath: sourcePath,
+            type: result.item,
+            actions: result.actions,
+            action: result.legacyAction,
+            legacyLongAction: result.legacyLongAction,
+            additionalParameters: additionalParameters
+        )
     }
 }
 
@@ -52,7 +64,8 @@ typealias ParametersDecoder = (Decoder) throws -> (
     parameters: [GeneralParameters.CodingKeys: GeneralParameter]
 )
 
-class SupportedTypesHolder {
+final class SupportedTypesHolder: @unchecked Sendable {
+    private let lock = NSLock()
     private var supportedTypes: [String: ParametersDecoder] = [
         "escape": { _ in (
             item: .staticButton(title: "esc"),
@@ -229,7 +242,22 @@ class SupportedTypesHolder {
     static let sharedInstance = SupportedTypesHolder()
 
     func lookup(by type: String, actions: [Action]) -> ParametersDecoder {
-        return supportedTypes[type] ?? { decoder in (
+        lock.lock()
+        let decoder = supportedTypes[type]
+        lock.unlock()
+        if let decoder {
+            return { input in
+                let decoded = try decoder(input)
+                return (
+                    item: decoded.item,
+                    actions: decoded.actions + actions,
+                    legacyAction: decoded.legacyAction,
+                    legacyLongAction: decoded.legacyLongAction,
+                    parameters: decoded.parameters
+                )
+            }
+        }
+        return { decoder in (
             item: try ItemType(from: decoder),
             actions: actions,
             legacyAction: try LegacyActionType(from: decoder),
@@ -239,7 +267,9 @@ class SupportedTypesHolder {
     }
 
     func register(typename: String, decoder: @escaping ParametersDecoder) {
+        lock.lock()
         supportedTypes[typename] = decoder
+        lock.unlock()
     }
 
     func register(typename: String, item: ItemType, actions: [Action], legacyAction: LegacyActionType, legacyLongAction: LegacyLongActionType) {
@@ -277,7 +307,7 @@ enum ItemType: Decodable {
     case network(flip: Bool, units: String)
     case darkMode
     case swipe(direction: String, fingers: Int, minOffset: Float, sourceApple: SourceProtocol?, sourceBash: SourceProtocol?)
-    case upnext(from: Double, to: Double, maxToShow: Int, autoResize: Bool)
+    case upnext(interval: Double, from: Double, to: Double, maxToShow: Int, autoResize: Bool)
 
     private enum CodingKeys: String, CodingKey {
         case type
@@ -444,7 +474,7 @@ enum ItemType: Decodable {
             let maxToShow = try container.decodeIfPresent(Int.self, forKey: .maxToShow) ?? 3 // 1 indexed array.  Get the 1st, 2nd, 3rd event to display multiple notifications
             let autoResize = try container.decodeIfPresent(Bool.self, forKey: .autoResize) ?? false
             let interval = try container.decodeIfPresent(Double.self, forKey: .refreshInterval) ?? 60.0
-            self = .upnext(from: from, to: to, maxToShow: maxToShow, autoResize: autoResize)
+            self = .upnext(interval: interval, from: from, to: to, maxToShow: maxToShow, autoResize: autoResize)
         }
     }
 }
@@ -471,6 +501,7 @@ struct Action: Decodable {
         case none
         case hidKey(keycode: Int32)
         case keyPress(keycode: Int)
+        case typeText(text: String)
         case appleScript(source: SourceProtocol)
         case shellScript(executable: String, parameters: [String])
         case custom(closure: () -> Void)
@@ -480,6 +511,7 @@ struct Action: Decodable {
     private enum ActionTypeRaw: String, Decodable {
         case hidKey
         case keyPress
+        case typeText
         case appleScript
         case shellScript
         case openUrl
@@ -489,6 +521,7 @@ struct Action: Decodable {
         case trigger
         case action
         case keycode
+        case text
         case actionAppleScript
         case executablePath
         case shellArguments
@@ -512,6 +545,10 @@ struct Action: Decodable {
         case .some(.keyPress):
             let keycode = try container.decode(Int.self, forKey: .keycode)
             value = .keyPress(keycode: keycode)
+
+        case .some(.typeText):
+            let text = try container.decode(String.self, forKey: .text)
+            value = .typeText(text: text)
 
         case .some(.appleScript):
             let source = try container.decode(Source.self, forKey: .actionAppleScript)
@@ -721,6 +758,10 @@ struct Source: Decodable, SourceProtocol {
     let filePath: String?
     let base64: String?
     let inline: String?
+    private let resolvedData: Data?
+    private let resolvedString: String?
+    private let resolvedImage: NSImage?
+    private let resolvedAppleScript: NSAppleScript?
 
     private enum CodingKeys: String, CodingKey {
         case filePath
@@ -729,29 +770,60 @@ struct Source: Decodable, SourceProtocol {
     }
 
     var data: Data? {
-        return base64?.base64Data ?? inline?.data(using: .utf8) ?? filePath?.fileData
+        return resolvedData
     }
 
     var string: String? {
-        return inline ?? filePath?.fileString
+        return resolvedString
     }
 
     var image: NSImage? {
-        return data?.image
+        return resolvedImage
     }
 
     var appleScript: NSAppleScript? {
-        return filePath?.fileURL.appleScript ?? string?.appleScript
+        return resolvedAppleScript
     }
 
     private init(filePath: String?, base64: String?, inline: String?) {
         self.filePath = filePath
         self.base64 = base64
         self.inline = inline
+        let data = base64?.base64Data ?? inline?.data(using: .utf8) ?? filePath?.fileData
+        let string = inline ?? data.flatMap(Self.decodeText)
+        resolvedData = data
+        resolvedString = string
+        resolvedImage = data?.image
+        resolvedAppleScript = filePath?.fileURL.appleScript ?? string?.appleScript
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.init(
+            filePath: try container.decodeIfPresent(String.self, forKey: .filePath),
+            base64: try container.decodeIfPresent(String.self, forKey: .base64),
+            inline: try container.decodeIfPresent(String.self, forKey: .inline)
+        )
     }
 
     init(filePath: String) {
         self.init(filePath: filePath, base64: nil, inline: nil)
+    }
+
+    private static func decodeText(_ data: Data) -> String? {
+        for encoding in [
+            String.Encoding.utf8,
+            .utf16,
+            .utf16LittleEndian,
+            .utf16BigEndian,
+            .macOSRoman,
+            .isoLatin1,
+        ] {
+            if let value = String(data: data, encoding: encoding) {
+                return value
+            }
+        }
+        return nil
     }
 }
 

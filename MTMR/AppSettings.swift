@@ -1,20 +1,24 @@
 import Foundation
 
+@MainActor
 struct AppSettings {
-    @UserDefault(key: "com.toxblh.mtmr.settings.showControlStrip", defaultValue: false)
+    @UserDefault(key: "com.tovam.MMTMR.settings.showControlStrip", defaultValue: false)
     static var showControlStripState: Bool
     
-    @UserDefault(key: "com.toxblh.mtmr.settings.hapticFeedback", defaultValue: true)
+    @UserDefault(key: "com.tovam.MMTMR.settings.hapticFeedback", defaultValue: true)
     static var hapticFeedbackState: Bool
     
-    @UserDefault(key: "com.toxblh.mtmr.settings.multitouchGestures", defaultValue: true)
+    @UserDefault(key: "com.tovam.MMTMR.settings.multitouchGestures", defaultValue: true)
     static var multitouchGestures: Bool
     
-    @UserDefault(key: "com.toxblh.mtmr.blackListedApps", defaultValue: [])
+    @UserDefault(key: "com.tovam.MMTMR.blackListedApps", defaultValue: [])
     static var blacklistedAppIds: [String]
     
-    @UserDefault(key: "com.toxblh.mtmr.dock.persistent", defaultValue: [])
+    @UserDefault(key: "com.tovam.MMTMR.dock.persistent", defaultValue: [])
     static var dockPersistentAppIds: [String]
+
+    @UserDefault(key: "com.tovam.MMTMR.editor.port", defaultValue: 8787)
+    static var editorPort: Int
 }
 
 @propertyWrapper

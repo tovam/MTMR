@@ -77,7 +77,7 @@ class AppleScriptTouchBarItem: CustomButtonTouchBarItem {
             return "error"
         }
         if output.descriptorType == typeAEList {
-            let arr = Array(1...output.numberOfItems).compactMap({ output.atIndex($0)!.stringValue ?? "" })
+            let arr = output.listStringValues
 
             if arr.count <= 0 {
                 return ""

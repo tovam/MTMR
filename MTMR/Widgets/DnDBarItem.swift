@@ -37,6 +37,7 @@ class DnDBarItem: CustomButtonTouchBarItem {
     }
 }
 
+@MainActor
 public struct DoNotDisturb {
     private static let appId = "com.apple.notificationcenterui" as CFString
     private static let dndPref = "com.apple.notificationcenterui.dndprefs_changed"

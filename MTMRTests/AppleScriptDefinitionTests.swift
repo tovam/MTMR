@@ -63,4 +63,10 @@ class AppleScriptDefinitionTests: XCTestCase {
             return
         }
     }
+
+    func testEmptyAppleScriptListHasNoValues() {
+        let list = NSAppleEventDescriptor.list()
+
+        XCTAssertEqual(list.listStringValues, [])
+    }
 }

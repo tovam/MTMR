@@ -30,6 +30,18 @@ class ParseConfig: XCTestCase {
             return
         }
     }
+
+    func testButtonUnicodeTextAction() {
+        let buttonFixture = """
+            [  { "type": "staticButton", "title": "Unicode", "actions": [ { "trigger": "singleTap", "action": "typeText", "text": "ž👍" } ] } ]
+        """.data(using: .utf8)!
+        let result = try? JSONDecoder().decode([BarItemDefinition].self, from: buttonFixture)
+
+        guard case .typeText(text: "ž👍")? = result?.first?.actions.first?.value else {
+            XCTFail()
+            return
+        }
+    }
     
     func testButtonKeyCodeLegacyAction() {
         let buttonKeycodeFixture = """
@@ -63,7 +75,7 @@ class ParseConfig: XCTestCase {
 
     func testExtendedWidthForPredefinedItem() {
         let buttonKeycodeFixture = """
-            [  { "type": "escape", "width": 110}, ]
+            [  { "type": "escape", "width": 110} ]
         """.data(using: .utf8)!
         let result = try? JSONDecoder().decode([BarItemDefinition].self, from: buttonKeycodeFixture)
         guard case .staticButton("esc")? = result?.first?.type else {
@@ -78,5 +90,30 @@ class ParseConfig: XCTestCase {
             XCTFail()
             return
         }
+    }
+
+    func testFileSourceKeepsResolvedContentAfterTheFileChanges() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("mmtmr-source-tests-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let fileURL = directory.appendingPathComponent("title.txt")
+        try Data("premier".utf8).write(to: fileURL)
+        let payload = try JSONSerialization.data(withJSONObject: ["filePath": fileURL.path])
+
+        let source = try JSONDecoder().decode(Source.self, from: payload)
+        try Data("second".utf8).write(to: fileURL)
+
+        XCTAssertEqual(source.string, "premier")
+        XCTAssertEqual(source.data, Data("premier".utf8))
+    }
+
+    func testBase64SourceCanResolveUTF8TextWithoutDiskAccess() throws {
+        let encoded = Data("return \"ž\"".utf8).base64EncodedString()
+        let payload = try JSONSerialization.data(withJSONObject: ["base64": encoded])
+        let source = try JSONDecoder().decode(Source.self, from: payload)
+
+        XCTAssertEqual(source.string, "return \"ž\"")
+        XCTAssertNotNil(source.appleScript)
     }
 }

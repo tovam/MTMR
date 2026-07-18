@@ -9,7 +9,7 @@
 import Cocoa
 
 class PomodoroBarItem: CustomButtonTouchBarItem, Widget {
-    static let identifier = "com.toxblh.mtmr.pomodoro."
+    static let identifier = "com.tovam.MMTMR.pomodoro."
     static let name = "pomodoro"
     static let decoder: ParametersDecoder = { decoder in
         enum CodingKeys: String, CodingKey {

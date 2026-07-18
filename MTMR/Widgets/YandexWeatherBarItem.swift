@@ -7,9 +7,9 @@
 //
 
 import Cocoa
-import CoreLocation
+@preconcurrency import CoreLocation
 
-class YandexWeatherBarItem: CustomButtonTouchBarItem, CLLocationManagerDelegate {
+class YandexWeatherBarItem: CustomButtonTouchBarItem, @preconcurrency CLLocationManagerDelegate {
     private let activity: NSBackgroundActivityScheduler
     private let unitsStr = "°C"
     private let iconsSource = [

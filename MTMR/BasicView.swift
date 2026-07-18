@@ -10,6 +10,7 @@ import Foundation
 
 
 class BasicView: NSCustomTouchBarItem, NSGestureRecognizerDelegate {
+    private let stackView = NSStackView()
     var twofingers: NSPanGestureRecognizer!
     var threefingers: NSPanGestureRecognizer!
     var fourfingers: NSPanGestureRecognizer!
@@ -23,12 +24,10 @@ class BasicView: NSCustomTouchBarItem, NSGestureRecognizerDelegate {
 
     init(identifier: NSTouchBarItem.Identifier, items: [NSTouchBarItem], swipeItems: [SwipeItem]) {
         super.init(identifier: identifier)
-        self.swipeItems = swipeItems
-        let views = items.compactMap { $0.view }
-        let stackView = NSStackView(views: views)
         stackView.spacing = 2
         stackView.orientation = .horizontal
         view = stackView
+        update(items: items, swipeItems: swipeItems)
 
         twofingers = NSPanGestureRecognizer(target: self, action: #selector(twofingersHandler(_:)))
         twofingers.numberOfTouchesRequired = 2
@@ -44,6 +43,17 @@ class BasicView: NSCustomTouchBarItem, NSGestureRecognizerDelegate {
         fourfingers.numberOfTouchesRequired = 4
         fourfingers.allowedTouchTypes = .direct
         view.addGestureRecognizer(fourfingers)
+    }
+
+    func update(items: [NSTouchBarItem], swipeItems: [SwipeItem]) {
+        self.swipeItems = swipeItems
+        for arrangedView in stackView.arrangedSubviews {
+            stackView.removeArrangedSubview(arrangedView)
+            arrangedView.removeFromSuperview()
+        }
+        for itemView in items.compactMap(\.view) {
+            stackView.addArrangedSubview(itemView)
+        }
     }
 
     required init?(coder _: NSCoder) {

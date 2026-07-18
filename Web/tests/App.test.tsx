@@ -1,0 +1,440 @@
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/preact";
+import userEvent from "@testing-library/user-event";
+import { EditorView } from "@codemirror/view";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { App } from "../src/App";
+
+const config = {
+  formatVersion: 1,
+  items: [{
+    id: "hello",
+    type: "staticButton",
+    title: "Bonjour",
+    align: "left",
+    enabled: true,
+    actions: [{ trigger: "singleTap", action: "typeText", text: "ž" }],
+  }],
+};
+
+const schema = {
+  type: "object",
+  properties: {
+    items: {
+      type: "array",
+      items: {
+        oneOf: [{
+          title: "Bouton statique",
+          type: "object",
+          properties: {
+            id: { type: "string", readOnly: true },
+            type: { const: "staticButton" },
+            title: { type: "string" },
+            align: { type: "string", enum: ["left", "center", "right"] },
+            enabled: { type: "boolean", default: true },
+            actions: { type: "array", items: { $ref: "#/$defs/action" } },
+          },
+          required: ["id", "type"],
+        }],
+      },
+    },
+  },
+  $defs: {
+    source: {
+      type: "object",
+      properties: {
+        inline: { type: "string" },
+        filePath: { type: "string" },
+        base64: { type: "string" },
+      },
+    },
+    action: {
+      oneOf: [
+        {
+          title: "Saisir du texte",
+          type: "object",
+          properties: {
+            trigger: { type: "string", enum: ["singleTap", "doubleTap", "tripleTap", "longTap"], default: "singleTap" },
+            action: { const: "typeText" },
+            text: { type: "string" },
+          },
+          required: ["trigger", "action", "text"],
+        },
+        {
+          title: "Script shell",
+          type: "object",
+          properties: {
+            trigger: { type: "string", enum: ["singleTap", "doubleTap", "tripleTap", "longTap"], default: "singleTap" },
+            action: { const: "shellScript" },
+            executablePath: { type: "string" },
+            shellArguments: { type: "array", default: [] },
+          },
+          required: ["trigger", "action", "executablePath"],
+        },
+      ],
+    },
+  },
+};
+
+function jsonResponse(value: unknown, status = 200) {
+  return new Response(JSON.stringify(value), {
+    status,
+    headers: { "Content-Type": "application/json" },
+  });
+}
+
+class MockWebSocket extends EventTarget {
+  static OPEN = 1;
+  static instances: MockWebSocket[] = [];
+  readyState = MockWebSocket.OPEN;
+  constructor(_url: string) {
+    super();
+    MockWebSocket.instances.push(this);
+    queueMicrotask(() => this.dispatchEvent(new Event("open")));
+  }
+  sendEvent(value: unknown) {
+    this.dispatchEvent(new MessageEvent("message", { data: JSON.stringify(value) }));
+  }
+  close() { this.dispatchEvent(new Event("close")); }
+}
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((fulfill) => { resolve = fulfill; });
+  return { promise, resolve };
+}
+
+describe("éditeur MMTMR", () => {
+  beforeEach(() => {
+    MockWebSocket.instances = [];
+    vi.stubGlobal("WebSocket", MockWebSocket);
+    vi.stubGlobal("fetch", vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith("/session")) return jsonResponse({ ok: true });
+      if (url.endsWith("/status")) return jsonResponse({ version: "1.0", port: 8787, configPath: "/Users/test/.mtmr.json", revision: 4, valid: true });
+      if (url.endsWith("/schema")) return jsonResponse(schema);
+      if (url.endsWith("/validate")) {
+        const source = JSON.parse(String(init?.body)).source as string;
+        return jsonResponse({ valid: true, document: JSON.parse(source), diagnostics: [] });
+      }
+      if (url.endsWith("/preview/context")) return jsonResponse({ context: JSON.parse(String(init?.body)) });
+      if (url.endsWith("/preview/action")) return jsonResponse({ executed: false, description: "La lettre ž serait saisie." });
+      if (url.endsWith("/config") && init?.method === "PUT") {
+        const source = JSON.parse(String(init.body)).source as string;
+        return jsonResponse({ source, document: JSON.parse(source), revision: 5, diagnostics: [], valid: true });
+      }
+      return jsonResponse({ source: `${JSON.stringify(config, null, 2)}\n`, document: config, revision: 4, diagnostics: [], valid: true });
+    }));
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.unstubAllGlobals();
+  });
+
+  it("affiche le shell et la configuration reçue", async () => {
+    render(<App />);
+    expect(screen.getByText("MMTMR")).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "Bonjour" })).toBeInTheDocument();
+    expect(screen.getByText("/Users/test/.mtmr.json")).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText("Connecté")).toBeInTheDocument());
+  });
+
+  it("établit la session locale avant de charger l’API", async () => {
+    render(<App />);
+    await screen.findByRole("button", { name: "Bonjour" });
+    expect(String(vi.mocked(fetch).mock.calls[0][0])).toMatch(/\/api\/v1\/session$/);
+  });
+
+  it("sélectionne un élément et expose son action Unicode dans l’inspecteur", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(await screen.findByRole("button", { name: "Bonjour" }));
+    expect(screen.getByRole("heading", { name: "Bonjour" })).toBeInTheDocument();
+    expect(screen.getByDisplayValue("ž")).toBeInTheDocument();
+  });
+
+  it("ajoute un composant de palette et active undo", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByRole("button", { name: "Bonjour" });
+    const paletteEntry = await screen.findByTitle("Ajouter Bouton statique");
+    fireEvent.dblClick(paletteEntry);
+    await waitFor(() => expect(screen.getByRole("button", { name: "Nouveau" })).toBeInTheDocument());
+    expect(screen.getByRole("button", { name: "Annuler" })).not.toBeDisabled();
+    await user.click(screen.getByRole("button", { name: "Annuler" }));
+    expect(screen.queryByRole("button", { name: "Nouveau" })).not.toBeInTheDocument();
+  });
+
+  it("dépose un composant de palette dans la zone centrale", async () => {
+    render(<App />);
+    await screen.findByRole("button", { name: "Bonjour" });
+    const data = new Map<string, string>();
+    const transfer = {
+      effectAllowed: "none",
+      dropEffect: "none",
+      setData(type: string, value: string) { data.set(type, value); },
+      getData(type: string) { return data.get(type) ?? ""; },
+    };
+    fireEvent.dragStart(screen.getByTitle("Ajouter Bouton statique"), { dataTransfer: transfer });
+    const center = screen.getByTestId("drop-center");
+    fireEvent.dragOver(center, { dataTransfer: transfer });
+    fireEvent.drop(center, { dataTransfer: transfer });
+    await waitFor(() => expect(within(center).getByRole("button", { name: "Nouveau" })).toBeInTheDocument());
+  });
+
+  it("enregistre automatiquement un formulaire valide après debounce", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByRole("button", { name: "Bonjour" });
+    const title = screen.getByDisplayValue("Bonjour");
+    await user.clear(title);
+    await user.type(title, "Salut");
+    await waitFor(() => {
+      const calls = vi.mocked(fetch).mock.calls;
+      const put = calls.find(([, init]) => init?.method === "PUT");
+      expect(put).toBeDefined();
+      expect(String(put?.[1]?.body)).toContain("Salut");
+      expect(new Headers(put?.[1]?.headers).get("If-Match")).toBe('"4"');
+    }, { timeout: 2_000 });
+  });
+
+  it("conserve une saisie plus récente quand un PUT lent se termine", async () => {
+    const user = userEvent.setup();
+    const originalFetch = vi.mocked(fetch).getMockImplementation()!;
+    const firstPUT = deferred<Response>();
+    let firstSource = "";
+    let putCount = 0;
+    vi.mocked(fetch).mockImplementation(async (input, init) => {
+      if (String(input).endsWith("/config") && init?.method === "PUT") {
+        putCount += 1;
+        if (putCount === 1) {
+          firstSource = JSON.parse(String(init.body)).source as string;
+          return firstPUT.promise;
+        }
+      }
+      return originalFetch(input, init);
+    });
+
+    render(<App />);
+    await screen.findByRole("button", { name: "Bonjour" });
+    const title = screen.getByDisplayValue("Bonjour");
+    await user.clear(title);
+    await user.type(title, "Premier");
+    await waitFor(() => expect(putCount).toBe(1), { timeout: 2_000 });
+
+    await user.clear(screen.getByDisplayValue("Premier"));
+    await user.type(title, "Deuxieme");
+    firstPUT.resolve(jsonResponse({
+      source: firstSource,
+      document: JSON.parse(firstSource),
+      revision: 5,
+      diagnostics: [],
+      valid: true,
+    }));
+
+    await waitFor(() => expect(screen.getByDisplayValue("Deuxieme")).toBeInTheDocument());
+    await waitFor(() => expect(putCount).toBe(2), { timeout: 2_500 });
+    const putCalls = vi.mocked(fetch).mock.calls.filter(([, init]) => init?.method === "PUT");
+    expect(String(putCalls[1][1]?.body)).toContain("Deuxieme");
+    expect(new Headers(putCalls[1][1]?.headers).get("If-Match")).toBe('"5"');
+  });
+
+  it("reconstruit une action depuis le schéma sans garder ses anciens paramètres", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(await screen.findByRole("button", { name: "Bonjour" }));
+    const actionType = screen.getByLabelText("Type d’action");
+    const trigger = screen.getByLabelText("Déclencheur", { selector: "select" });
+    expect(within(trigger).getByRole("option", { name: "tripleTap" })).toBeInTheDocument();
+
+    await user.selectOptions(actionType, "shellScript");
+    expect(screen.queryByDisplayValue("ž")).not.toBeInTheDocument();
+    expect(screen.getByText("Exécutable")).toBeInTheDocument();
+    await user.selectOptions(actionType, "typeText");
+    expect(screen.getByText("Texte UTF-8")).toBeInTheDocument();
+    expect(screen.queryByDisplayValue("ž")).not.toBeInTheDocument();
+  });
+
+  it("verrouille les gestes visuels tant que le brouillon JSON est invalide", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByRole("button", { name: "Bonjour" });
+    await user.click(screen.getByRole("tab", { name: "JSON" }));
+    const editorDOM = screen.getByTestId("json-editor").querySelector(".cm-editor") as HTMLElement;
+    const view = EditorView.findFromDOM(editorDOM);
+    expect(view).not.toBeNull();
+    view!.dispatch({ changes: { from: 0, to: view!.state.doc.length, insert: "{" } });
+
+    await user.click(screen.getByRole("tab", { name: "Formulaire" }));
+    expect(await screen.findByText(/Le brouillon JSON est invalide/)).toBeInTheDocument();
+    expect(screen.getByTitle("Ajouter Bouton statique")).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Dupliquer" })).toBeDisabled();
+  });
+
+  it("verrouille aussi le formulaire quand le fichier externe reçu est invalide", async () => {
+    const originalFetch = vi.mocked(fetch).getMockImplementation()!;
+    vi.mocked(fetch).mockImplementation(async (input, init) => {
+      if (String(input).endsWith("/config") && init?.method !== "PUT") {
+        return jsonResponse({
+          source: "{",
+          revision: 5,
+          diagnostics: [{ severity: "error", message: "JSON externe invalide", code: "json.invalid" }],
+          valid: false,
+        });
+      }
+      return originalFetch(input, init);
+    });
+
+    render(<App />);
+    expect(await screen.findByText(/Le brouillon JSON est invalide/)).toBeInTheDocument();
+    expect(screen.getByTitle("Ajouter Bouton statique")).toBeDisabled();
+    expect(screen.getByPlaceholderText("Notes sur cette configuration…")).toBeDisabled();
+    expect(vi.mocked(fetch).mock.calls.some(([, init]) => init?.method === "PUT")).toBe(false);
+  });
+
+  it("ne remplace pas une saisie créée pendant le GET déclenché par WebSocket", async () => {
+    const user = userEvent.setup();
+    const originalFetch = vi.mocked(fetch).getMockImplementation()!;
+    const externalGET = deferred<Response>();
+    let configGETCount = 0;
+    vi.mocked(fetch).mockImplementation(async (input, init) => {
+      if (String(input).endsWith("/config") && init?.method !== "PUT") {
+        configGETCount += 1;
+        if (configGETCount === 2) return externalGET.promise;
+      }
+      if (String(input).endsWith("/config") && init?.method === "PUT") {
+        return jsonResponse({
+          error: { code: "revision_conflict", message: "Révision obsolète" },
+          revision: 5,
+        }, 409);
+      }
+      return originalFetch(input, init);
+    });
+
+    render(<App />);
+    await screen.findByRole("button", { name: "Bonjour" });
+    await waitFor(() => expect(MockWebSocket.instances).toHaveLength(1));
+    MockWebSocket.instances[0].sendEvent({
+      type: "config.changed",
+      revision: 5,
+      timestamp: new Date().toISOString(),
+      payload: {},
+    });
+    await waitFor(() => expect(configGETCount).toBe(2));
+
+    const title = screen.getByDisplayValue("Bonjour");
+    await user.clear(title);
+    await user.type(title, "Brouillon pendant GET");
+    const external = { ...config, items: [{ ...config.items[0], title: "Externe" }] };
+    externalGET.resolve(jsonResponse({
+      source: `${JSON.stringify(external, null, 2)}\n`,
+      document: external,
+      revision: 5,
+      diagnostics: [],
+      valid: true,
+    }));
+
+    expect(await screen.findByDisplayValue("Brouillon pendant GET")).toBeInTheDocument();
+    expect(await screen.findByText("Conflit de révision")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Enregistrer" }));
+    await waitFor(() => {
+      const put = vi.mocked(fetch).mock.calls.find(([, init]) => init?.method === "PUT");
+      expect(new Headers(put?.[1]?.headers).get("If-Match")).toBe('"4"');
+    });
+  });
+
+  it("conserve le brouillon lorsqu’une révision externe arrive", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByRole("button", { name: "Bonjour" });
+    const title = screen.getByDisplayValue("Bonjour");
+    await user.clear(title);
+    await user.type(title, "Brouillon local");
+    MockWebSocket.instances[0].sendEvent({
+      type: "config.changed",
+      revision: 99,
+      timestamp: new Date().toISOString(),
+      payload: {},
+    });
+    expect(await screen.findByText("Conflit de révision")).toBeInTheDocument();
+    expect(screen.getByDisplayValue("Brouillon local")).toBeInTheDocument();
+  });
+
+  it("applique la géométrie native reçue par WebSocket", async () => {
+    render(<App />);
+    await screen.findByRole("button", { name: "Bonjour" });
+    await waitFor(() => expect(MockWebSocket.instances).toHaveLength(1));
+    MockWebSocket.instances[0].sendEvent({
+      type: "runtime.snapshot",
+      timestamp: new Date().toISOString(),
+      payload: { items: [{ id: "hello", x: 500, width: 123, align: "right", visible: true }] },
+    });
+    let nativeItem: HTMLElement | undefined;
+    await waitFor(() => {
+      nativeItem = within(screen.getByTestId("drop-right")).getByRole("button", { name: "Bonjour" });
+      expect(nativeItem).toBeInTheDocument();
+    });
+    expect(nativeItem).toHaveStyle({ width: "123px" });
+    expect(screen.getByText("Géométrie native synchronisée")).toBeInTheDocument();
+  });
+
+  it("applique le contexte runtime sans le polluer avec une simulation d’action", async () => {
+    render(<App />);
+    await screen.findByRole("button", { name: "Bonjour" });
+    await waitFor(() => expect(MockWebSocket.instances).toHaveLength(1));
+    MockWebSocket.instances[0].sendEvent({
+      type: "runtime.snapshot",
+      timestamp: new Date().toISOString(),
+      payload: {
+        items: [],
+        context: { application: "Xcode", battery: 51, networkConnected: false, theme: "light", time: "2026-07-18T14:26:00Z" },
+      },
+    });
+    await waitFor(() => expect(screen.getByText("Xcode")).toBeInTheDocument());
+    expect(screen.getByLabelText("Aperçu de la Touch Bar")).toHaveAttribute("data-theme", "light");
+
+    MockWebSocket.instances[0].sendEvent({
+      type: "simulation.changed",
+      timestamp: new Date().toISOString(),
+      payload: { kind: "action", context: { application: "Ne doit pas apparaître", theme: "dark" }, description: "Action seulement décrite" },
+    });
+    expect(screen.getByText("Xcode")).toBeInTheDocument();
+    expect(screen.queryByText("Ne doit pas apparaître")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Aperçu de la Touch Bar")).toHaveAttribute("data-theme", "light");
+  });
+
+  it("simule une action sans demander son exécution", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByRole("button", { name: "Bonjour" });
+    await user.click(screen.getByRole("tab", { name: "Simulation" }));
+    await user.click(screen.getByRole("button", { name: "Simuler, sans exécuter" }));
+    expect(await screen.findByText("La lettre ž serait saisie.")).toBeInTheDocument();
+    const call = vi.mocked(fetch).mock.calls.find(([url]) => String(url).endsWith("/preview/action"));
+    expect(call).toBeDefined();
+    const body = JSON.parse(String(call?.[1]?.body));
+    expect(body).toMatchObject({ itemID: "hello", trigger: "singleTap" });
+    expect(body).not.toHaveProperty("execute");
+  });
+
+  it("replie indépendamment les deux panneaux latéraux", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByRole("button", { name: "Bonjour" });
+    await user.click(screen.getByRole("button", { name: "Replier la palette" }));
+    await user.click(screen.getByRole("button", { name: "Replier l’inspecteur" }));
+    expect(screen.getByRole("button", { name: "Ouvrir la palette" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Ouvrir l’inspecteur" })).toBeInTheDocument();
+  });
+
+  it("se reconnecte au WebSocket après une coupure", async () => {
+    render(<App />);
+    await screen.findByRole("button", { name: "Bonjour" });
+    await waitFor(() => expect(screen.getByText("Connecté")).toBeInTheDocument());
+    expect(MockWebSocket.instances).toHaveLength(1);
+    MockWebSocket.instances[0].close();
+    await waitFor(() => expect(screen.getByText("Déconnecté")).toBeInTheDocument());
+    await waitFor(() => expect(MockWebSocket.instances).toHaveLength(2), { timeout: 1_500 });
+    await waitFor(() => expect(screen.getByText("Connecté")).toBeInTheDocument());
+  });
+});

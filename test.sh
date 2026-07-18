@@ -1,31 +1,20 @@
-# INSTALL xcpretty: sudo gem install xcpretty
+#!/bin/sh
 
-NAME='MTMR'
-killall $NAME
+set -eu
 
-rm -r Release 2>/dev/null
+PROJECT_ROOT=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+LOCAL_BUILD_DIR="$PROJECT_ROOT/build-checks/xcode-tests"
 
-# xcodebuild \
-#     -workspace ./MTMR.xcodeproj/project.xcworkspace \
-#     -scheme MTMR \
-#     -configuration Release CONFIGURATION_BUILD_DIR=./build/Release
+if [ "$(xcode-select -p 2>/dev/null || true)" = "/Library/Developer/CommandLineTools" ]; then
+    echo "MMTMR tests require a complete Xcode installation (not only Command Line Tools)." >&2
+    exit 1
+fi
 
-xcodebuild archive \
-	-scheme "$NAME" \
-	-archivePath Release/App.xcarchive | xcpretty
+mkdir -p "$LOCAL_BUILD_DIR"
 
-xcodebuild \
-	-exportArchive \
-	-archivePath Release/App.xcarchive \
-	-exportOptionsPlist export-options.plist \
-	-exportPath Release | xcpretty
-
-cd Release
-rm -r App.xcarchive
-
-# Prerequisite: npm i -g create-dmg
-NAME_DMG="${NAME}.app"
-echo $NAME_DMG
-create-dmg $NAME_DMG
-
-open ./$NAME.app
+xcodebuild test \
+    -project "$PROJECT_ROOT/MTMR.xcodeproj" \
+    -scheme MMTMR \
+    -configuration Debug \
+    -derivedDataPath "$LOCAL_BUILD_DIR/DerivedData" \
+    -clonedSourcePackagesDirPath "$LOCAL_BUILD_DIR/SourcePackages"
