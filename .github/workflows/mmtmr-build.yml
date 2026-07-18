@@ -6,7 +6,7 @@ on:
   pull_request:
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: mmtmr-ci-${{ github.ref }}
@@ -113,6 +113,27 @@ jobs:
           path: ${{ env.CI_ROOT }}/MMTMR-unsigned.zip
           if-no-files-found: error
           retention-days: 14
+
+      - name: Publish the rolling development build
+        if: github.event_name == 'push' && github.ref == 'refs/heads/codex/mmtmr-build-test'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          RELEASE_TAG="mmtmr-development"
+          RELEASE_NOTES="Build automatique non signé de ${GITHUB_SHA}. Tests web et Swift validés par GitHub Actions."
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            gh release upload "$RELEASE_TAG" "$CI_ROOT/MMTMR-unsigned.zip" --clobber
+            gh release edit "$RELEASE_TAG" \
+              --title "MMTMR — build de développement" \
+              --notes "$RELEASE_NOTES" \
+              --prerelease
+          else
+            gh release create "$RELEASE_TAG" "$CI_ROOT/MMTMR-unsigned.zip" \
+              --target "$GITHUB_SHA" \
+              --title "MMTMR — build de développement" \
+              --notes "$RELEASE_NOTES" \
+              --prerelease
+          fi
 
       - name: Upload test results on failure
         if: failure()
