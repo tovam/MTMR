@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
+import { api } from "../api";
 import {
   ACTION_TRIGGERS,
   actionSchemaForType,
@@ -11,7 +12,17 @@ import {
   schemaActionTypes,
   schemaItemTypes,
 } from "../model";
-import type { ActionConfig, Alignment, Diagnostic, ItemConfig, JsonObject, JsonSchema, JsonValue } from "../types";
+import type {
+  ActionConfig,
+  Alignment,
+  ApplicationDescriptor,
+  Diagnostic,
+  ItemConfig,
+  JsonObject,
+  JsonSchema,
+  JsonValue,
+  PinnedApplicationConfig,
+} from "../types";
 import { clearDragPayload, getDragPayload, setDragPayload } from "./Palette";
 import { ItemTypeIcon } from "./MediaControlIcon";
 
@@ -599,6 +610,278 @@ function AppleToggle({
   );
 }
 
+function PinnedApplicationIcon({ application, label }: { application?: ApplicationDescriptor; label: string }) {
+  return application?.icon ? (
+    <img class="pinned-app-icon" src={application.icon} title={label} alt="" aria-hidden="true" draggable={false} />
+  ) : (
+    <span class="pinned-app-icon pinned-app-icon-missing" title={label} aria-hidden="true">A</span>
+  );
+}
+
+function PinnedDockEditor({ item, onChange }: { item: ItemConfig; onChange(item: ItemConfig): void }) {
+  const [catalog, setCatalog] = useState<ApplicationDescriptor[]>([]);
+  const [catalogState, setCatalogState] = useState<"loading" | "ready" | "error">("loading");
+  const [catalogError, setCatalogError] = useState("");
+  const [query, setQuery] = useState("");
+  const [selectedIdentifier, setSelectedIdentifier] = useState("");
+  const [manualIdentifier, setManualIdentifier] = useState("");
+  const [draggedIndex, setDraggedIndex] = useState<number>();
+  const [dropIndex, setDropIndex] = useState<number>();
+  const configured = Array.isArray(item.applications) ? item.applications : [];
+  const catalogByIdentifier = useMemo(
+    () => new Map(catalog.map((application) => [application.bundleIdentifier, application])),
+    [catalog],
+  );
+
+  const loadCatalog = async () => {
+    setCatalogState("loading");
+    try {
+      const result = await api.applications();
+      setCatalog(result.applications);
+      setCatalogError("");
+      setCatalogState("ready");
+    } catch (error) {
+      setCatalogError(error instanceof Error ? error.message : "Catalogue indisponible");
+      setCatalogState("error");
+    }
+  };
+
+  useEffect(() => {
+    void loadCatalog();
+  }, []);
+
+  const configuredIdentifiers = useMemo(
+    () => new Set(configured.map((application) => application.bundleIdentifier)),
+    [configured],
+  );
+  const normalizedQuery = query.trim().toLocaleLowerCase();
+  const choices = catalog.filter((application) => {
+    if (configuredIdentifiers.has(application.bundleIdentifier)) return false;
+    if (!normalizedQuery) return true;
+    return [application.name, application.bundleIdentifier, application.path]
+      .some((value) => value.toLocaleLowerCase().includes(normalizedQuery));
+  });
+  const effectiveSelectedIdentifier = choices.some((application) => application.bundleIdentifier === selectedIdentifier)
+    ? selectedIdentifier
+    : choices[0]?.bundleIdentifier ?? "";
+  const selectedApplication = catalogByIdentifier.get(effectiveSelectedIdentifier);
+
+  const replaceApplications = (applications: PinnedApplicationConfig[]) => {
+    onChange({ ...item, applications });
+  };
+  const addIdentifier = (bundleIdentifier: string) => {
+    const trimmed = bundleIdentifier.trim();
+    if (!trimmed || configuredIdentifiers.has(trimmed)) return;
+    replaceApplications([...configured, { bundleIdentifier: trimmed }]);
+    setSelectedIdentifier("");
+  };
+  const patchApplication = (index: number, patch: Partial<PinnedApplicationConfig>) => {
+    replaceApplications(configured.map((application, candidateIndex) => (
+      candidateIndex === index ? { ...application, ...patch } : application
+    )));
+  };
+  const moveApplication = (from: number, to: number) => {
+    const bounded = Math.max(0, Math.min(to, configured.length - 1));
+    if (from === bounded || from < 0 || from >= configured.length) return;
+    const next = [...configured];
+    const [application] = next.splice(from, 1);
+    next.splice(bounded, 0, application);
+    replaceApplications(next);
+  };
+  const commitDrop = () => {
+    if (draggedIndex === undefined || dropIndex === undefined) return;
+    const insertion = draggedIndex < dropIndex ? dropIndex - 1 : dropIndex;
+    moveApplication(draggedIndex, insertion);
+    setDraggedIndex(undefined);
+    setDropIndex(undefined);
+  };
+
+  return (
+    <section class="pinned-dock-editor" aria-label="Applications du Dock fixe">
+      <div class="pinned-dock-heading">
+        <div>
+          <strong>Applications affichées</strong>
+          <small>Ordre fixe · ouvertes ou fermées</small>
+        </div>
+        <span class="count-pill">{configured.length}</span>
+      </div>
+
+      <div class="pinned-app-picker">
+        <label class="property-field">
+          <span class="field-label">Rechercher sur ce Mac</span>
+          <input
+            type="search"
+            value={query}
+            placeholder="Nom, identifiant ou dossier…"
+            onInput={(event) => setQuery(event.currentTarget.value)}
+          />
+        </label>
+        <div class="pinned-app-select-row">
+          <div class="pinned-app-select-preview">
+            <PinnedApplicationIcon application={selectedApplication} label={selectedApplication?.name ?? "Application"} />
+          </div>
+          <select
+            aria-label="Application à ajouter"
+            value={effectiveSelectedIdentifier}
+            disabled={catalogState === "loading" || choices.length === 0}
+            onChange={(event) => setSelectedIdentifier(event.currentTarget.value)}
+          >
+            {choices.slice(0, 250).map((application) => (
+              <option value={application.bundleIdentifier} key={application.bundleIdentifier}>
+                {application.name} — {application.running ? "ouverte" : "fermée"}
+              </option>
+            ))}
+          </select>
+          <button
+            type="button"
+            class="primary-button compact-button"
+            aria-label="Ajouter l’application sélectionnée"
+            disabled={!effectiveSelectedIdentifier}
+            onClick={() => addIdentifier(effectiveSelectedIdentifier)}
+          >
+            Ajouter
+          </button>
+        </div>
+        <div class="pinned-catalog-meta">
+          {catalogState === "loading" && <span>Lecture des applications installées…</span>}
+          {catalogState === "ready" && <span>{catalog.length} applications · {choices.length} disponibles</span>}
+          {catalogState === "error" && <span class="field-error">{catalogError}</span>}
+          <button type="button" class="danger-link" onClick={() => void loadCatalog()}>Actualiser</button>
+        </div>
+      </div>
+
+      <div
+        class="pinned-app-list"
+        onDragOver={(event) => {
+          if (draggedIndex === undefined || configured.length === 0) return;
+          event.preventDefault();
+        }}
+        onDrop={(event) => {
+          event.preventDefault();
+          commitDrop();
+        }}
+      >
+        {configured.length === 0 && (
+          <div class="empty-state compact">Choisissez une application ci-dessus. Le Dock gardera toujours sa place.</div>
+        )}
+        {configured.map((application, index) => {
+          const installed = catalogByIdentifier.get(application.bundleIdentifier);
+          const name = application.label?.trim() || installed?.name || application.bundleIdentifier;
+          const before = dropIndex === index;
+          const after = dropIndex === configured.length && index === configured.length - 1;
+          return (
+            <div class="pinned-app-entry" key={`${application.bundleIdentifier}-${index}`}>
+              {before && <div class="pinned-app-drop-line" />}
+              <article
+                class={`pinned-app-card ${draggedIndex === index ? "is-dragging" : ""}`}
+                draggable
+                onDragStart={(event) => {
+                  setDraggedIndex(index);
+                  setDropIndex(index);
+                  if (event.dataTransfer) {
+                    event.dataTransfer.effectAllowed = "move";
+                    event.dataTransfer.setData("text/plain", application.bundleIdentifier);
+                  }
+                }}
+                onDragEnd={() => {
+                  setDraggedIndex(undefined);
+                  setDropIndex(undefined);
+                }}
+                onDragOver={(event) => {
+                  if (draggedIndex === undefined) return;
+                  event.preventDefault();
+                  const bounds = event.currentTarget.getBoundingClientRect();
+                  setDropIndex(event.clientY < bounds.top + bounds.height / 2 ? index : index + 1);
+                }}
+              >
+                <span class="pinned-app-grip" title="Glisser pour réordonner" aria-hidden="true">⠿</span>
+                <PinnedApplicationIcon application={installed} label={name} />
+                <span class="pinned-app-identity">
+                  <strong>{name}</strong>
+                  <code>{application.bundleIdentifier}</code>
+                </span>
+                <span class={`pinned-app-status ${installed?.frontmost ? "frontmost" : installed?.running ? "running" : installed ? "closed" : "missing"}`}>
+                  {installed?.frontmost ? "au premier plan" : installed?.running ? "ouverte" : installed ? "fermée" : "introuvable"}
+                </span>
+                <span class="pinned-app-row-actions">
+                  <button type="button" class="icon-button" disabled={index === 0} onClick={() => moveApplication(index, index - 1)} aria-label={`Monter ${name}`}>↑</button>
+                  <button type="button" class="icon-button" disabled={index === configured.length - 1} onClick={() => moveApplication(index, index + 1)} aria-label={`Descendre ${name}`}>↓</button>
+                  <button type="button" class="icon-button pinned-remove" onClick={() => replaceApplications(configured.filter((_, candidate) => candidate !== index))} aria-label={`Retirer ${name}`}>×</button>
+                </span>
+                <details class="pinned-app-details">
+                  <summary>Nom et chemin facultatifs</summary>
+                  <label class="property-field">
+                    <span class="field-label">Nom personnel</span>
+                    <input
+                      type="text"
+                      value={application.label ?? ""}
+                      placeholder={installed?.name ?? "Nom dans l’éditeur"}
+                      onInput={(event) => patchApplication(index, { label: event.currentTarget.value || undefined })}
+                    />
+                  </label>
+                  <label class="property-field">
+                    <span class="field-label">Chemin de secours</span>
+                    <input
+                      type="text"
+                      value={application.path ?? ""}
+                      placeholder={installed?.path ?? "/Applications/MonApp.app"}
+                      onInput={(event) => patchApplication(index, { path: event.currentTarget.value || undefined })}
+                    />
+                  </label>
+                </details>
+              </article>
+              {after && <div class="pinned-app-drop-line" />}
+            </div>
+          );
+        })}
+      </div>
+
+      <details class="pinned-manual-add">
+        <summary>Ajouter par identifiant de bundle</summary>
+        <p>Pour une application absente du catalogue, saisissez son identifiant macOS.</p>
+        <div class="pinned-manual-row">
+          <input
+            type="text"
+            value={manualIdentifier}
+            placeholder="com.exemple.Application"
+            onInput={(event) => setManualIdentifier(event.currentTarget.value)}
+            onKeyDown={(event) => {
+              if (event.key !== "Enter") return;
+              event.preventDefault();
+              addIdentifier(manualIdentifier);
+              setManualIdentifier("");
+            }}
+          />
+          <button
+            type="button"
+            class="secondary-button compact-button"
+            aria-label="Ajouter l’identifiant de bundle"
+            disabled={!manualIdentifier.trim() || configuredIdentifiers.has(manualIdentifier.trim())}
+            onClick={() => {
+              addIdentifier(manualIdentifier);
+              setManualIdentifier("");
+            }}
+          >
+            Ajouter
+          </button>
+        </div>
+      </details>
+
+      <label class="property-field pinned-long-press">
+        <span class="field-label">Appui long</span>
+        <span class="field-description">Action après 1,5 seconde sur une application ouverte.</span>
+        <select
+          value={typeof item.longPressAction === "string" ? item.longPressAction : "quit"}
+          onChange={(event) => onChange({ ...item, longPressAction: event.currentTarget.value })}
+        >
+          <option value="quit">Quitter l’application</option>
+          <option value="none">Ne rien faire</option>
+        </select>
+      </label>
+    </section>
+  );
+}
+
 export function Inspector({
   item,
   itemPath,
@@ -636,7 +919,8 @@ export function Inspector({
     const preferred = [
       "editorName", "title", "notes", "align", "width", "image", "background", "matchAppId",
       "source", "refreshInterval", "formatTemplate", "timeZone", "locale", "alternativeImages",
-      "autoResize", "filter", "units", "api_key", "icon_type", "from", "to", "full",
+      "autoResize", "filter", "applications", "showRunningIndicator", "longPressAction",
+      "units", "api_key", "icon_type", "from", "to", "full",
       "disableMarquee", "items", "workTime", "restTime", "flip", "direction", "fingers",
       "minOffset", "sourceApple", "sourceBash", "maxToShow", "id", "type",
     ];
@@ -645,8 +929,9 @@ export function Inspector({
       .filter(([name]) => {
         if (["actions", "enabled", "bordered"].includes(name)) return false;
         if (item?.type === "group" && name === "items") return false;
-        if (item?.type === "dock" && name === "autoResize") return false;
-        if (item?.type === "dock" && item.autoResize !== false && name === "width") return false;
+        if (["dock", "pinnedDock"].includes(item?.type ?? "") && name === "autoResize") return false;
+        if (["dock", "pinnedDock"].includes(item?.type ?? "") && item?.autoResize !== false && name === "width") return false;
+        if (item?.type === "pinnedDock" && ["applications", "showRunningIndicator", "longPressAction"].includes(name)) return false;
         return true;
       })
       .sort(([left], [right]) => (rank.get(left) ?? 1_000) - (rank.get(right) ?? 1_000));
@@ -702,16 +987,24 @@ export function Inspector({
                   checked={item.bordered !== false}
                   onChange={(bordered) => onChange({ ...item, bordered })}
                 />
-                {item.type === "dock" && (
+                {["dock", "pinnedDock"].includes(item.type) && (
                   <AppleToggle
                     label="Largeur automatique"
-                    detail="Ajuster le Dock aux icônes (recommandé)"
+                    detail="Ajuster le Dock exactement aux icônes"
                     checked={item.autoResize !== false}
                     onChange={(autoResize) => {
                       const next: ItemConfig = { ...item, autoResize };
                       if (autoResize) delete next.width;
                       onChange(next);
                     }}
+                  />
+                )}
+                {item.type === "pinnedDock" && (
+                  <AppleToggle
+                    label="Indicateur d’exécution"
+                    detail="Point blanc sous les apps ouvertes"
+                    checked={item.showRunningIndicator !== false}
+                    onChange={(showRunningIndicator) => onChange({ ...item, showRunningIndicator })}
                   />
                 )}
               </div>
@@ -725,6 +1018,7 @@ export function Inspector({
                   onAddToGroup={onAddToGroup}
                 />
               )}
+              {item.type === "pinnedDock" && <PinnedDockEditor item={item} onChange={onChange} />}
               <div class="property-list">
                 {orderedProperties.map(([name, propertySchema]) => (
                     <PropertyField

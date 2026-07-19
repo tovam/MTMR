@@ -26,6 +26,7 @@ export const FALLBACK_ITEM_TYPES: readonly PaletteItemPresentation[] = [
   { type: "battery", label: "Batterie", icon: "▰", description: "Affiche le niveau et l’état de la batterie du Mac. La valeur réelle arrive par le mode Direct.", examples: ["82 %", "En charge"] },
   { type: "cpu", label: "Processeur", icon: "%", description: "Affiche l’utilisation du processeur avec un rafraîchissement réglable. Convient à une surveillance rapide.", examples: ["CPU 18 %", "CPU 73 %"] },
   { type: "dock", label: "Applications", icon: "▦", description: "Présente les applications actives sous forme de Dock tactile. Les icônes exactes nécessitent le rendu Direct de MMTMR.", examples: ["Finder", "Safari", "Terminal"] },
+  { type: "pinnedDock", label: "Dock fixe", icon: "▣", description: "Affiche exactement les applications choisies, dans un ordre fixe, qu’elles soient ouvertes ou fermées. Un toucher active ou lance l’application.", examples: ["Finder + Firefox", "Terminal + Notes", "Apps de travail"] },
   { type: "volume", label: "Volume", icon: "◖", description: "Ajoute le contrôle interactif du volume système. Ce composant gère lui-même ses gestes.", examples: ["Curseur audio", "Muet"] },
   { type: "brightness", label: "Luminosité", icon: "☀", description: "Ajoute le contrôle interactif de luminosité. Une image personnalisée peut remplacer le symbole.", examples: ["Curseur écran", "☀"] },
   { type: "weather", label: "Météo", icon: "☁", description: "Affiche la météo depuis le fournisseur configuré. Une clé API et les unités peuvent être précisées.", examples: ["☀ 24°", "☂ 12°"] },
@@ -146,6 +147,27 @@ export function validateDocumentShape(value: unknown): Diagnostic[] {
     if (candidate.actions !== undefined && !Array.isArray(candidate.actions)) {
       diagnostics.push({ severity: "error", message: "actions doit être un tableau.", path: `${path}.actions` });
     }
+    if (candidate.type === "pinnedDock") {
+      if (!Array.isArray(candidate.applications)) {
+        diagnostics.push({ severity: "error", message: "applications doit être un tableau.", path: `${path}.applications` });
+      } else {
+        const applicationIDs = new Set<string>();
+        candidate.applications.forEach((application, applicationIndex) => {
+          const applicationPath = `${path}.applications[${applicationIndex}]`;
+          if (!isRecord(application)) {
+            diagnostics.push({ severity: "error", message: "L’application doit être un objet.", path: applicationPath });
+            return;
+          }
+          if (typeof application.bundleIdentifier !== "string" || application.bundleIdentifier.trim() === "") {
+            diagnostics.push({ severity: "error", message: "Un identifiant de bundle est requis.", path: `${applicationPath}.bundleIdentifier` });
+          } else if (applicationIDs.has(application.bundleIdentifier)) {
+            diagnostics.push({ severity: "error", message: `Application dupliquée : ${application.bundleIdentifier}`, path: `${applicationPath}.bundleIdentifier` });
+          } else {
+            applicationIDs.add(application.bundleIdentifier);
+          }
+        });
+      }
+    }
     if (candidate.items !== undefined) {
       if (Array.isArray(candidate.items)) validateItems(candidate.items, `${path}.items`);
       else diagnostics.push({ severity: "error", message: "items doit être un tableau.", path: `${path}.items` });
@@ -177,6 +199,12 @@ export function createItem(type: string, schema?: JsonSchema): ItemConfig {
   if (type === "group") {
     if (item.title === undefined) item.title = "Groupe";
     if (item.items === undefined) item.items = [];
+  }
+  if (type === "pinnedDock") {
+    if (item.applications === undefined) item.applications = [];
+    if (item.autoResize === undefined) item.autoResize = true;
+    if (item.showRunningIndicator === undefined) item.showRunningIndicator = true;
+    if (item.longPressAction === undefined) item.longPressAction = "quit";
   }
   if (item.editorName === undefined && typeSchema?.properties?.editorName !== undefined) {
     item.editorName = FALLBACK_ITEM_TYPES.find((entry) => entry.type === type)?.label ?? type;

@@ -65,7 +65,8 @@ private extension JSONValue {
         case let .object(object):
             return .object(object.mapValues { $0.resolvingFilePaths(relativeTo: configurationURL) }.mapValuesWithKey {
                 key, value in
-                guard (key == "filePath" || key == "executablePath"),
+                let isPinnedApplicationPath = key == "path" && object["bundleIdentifier"]?.stringValue != nil
+                guard (key == "filePath" || key == "executablePath" || isPinnedApplicationPath),
                       let rawPath = value.stringValue else { return value }
                 return .string(MMTMRConfigurationLocation.resolveResourcePath(rawPath, relativeTo: configurationURL).path)
             })

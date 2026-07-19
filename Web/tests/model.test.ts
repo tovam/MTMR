@@ -179,6 +179,16 @@ describe("modèle de configuration", () => {
     expect(createItem("dock", schema)).toMatchObject({ type: "dock", autoResize: true });
   });
 
+  it("crée un Dock fixe prêt à recevoir des applications", () => {
+    expect(createItem("pinnedDock")).toMatchObject({
+      type: "pinnedDock",
+      applications: [],
+      autoResize: true,
+      showRunningIndicator: true,
+      longPressAction: "quit",
+    });
+  });
+
   it("n’ajoute editorName que lorsque le schéma du binaire le permet", () => {
     const oldSchema: JsonSchema = {
       properties: { items: { items: { oneOf: [{ properties: { type: { const: "staticButton" } } }] } } },
@@ -190,12 +200,13 @@ describe("modèle de configuration", () => {
     expect(createItem("staticButton", newSchema)).toMatchObject({ editorName: "Bouton statique" });
   });
 
-  it("déclare les 38 composants avec des libellés français et des icônes distinctes", () => {
+  it("déclare les 39 composants avec des libellés français et des icônes distinctes", () => {
     const entries = schemaItemTypes();
-    expect(entries).toHaveLength(38);
+    expect(entries).toHaveLength(39);
+    expect(entries.find((entry) => entry.type === "pinnedDock")).toMatchObject({ label: "Dock fixe", icon: "▣" });
     expect(entries.find((entry) => entry.type === "volumeUp")).toMatchObject({ label: "Volume +", icon: "🔊" });
     expect(entries.find((entry) => entry.type === "volumeDown")).toMatchObject({ label: "Volume −", icon: "🔉" });
     expect(entries.every((entry) => entry.icon !== "◇" && entry.description.length > 0 && entry.examples.length > 0)).toBe(true);
-    expect(new Set(entries.map((entry) => entry.icon)).size).toBe(38);
+    expect(new Set(entries.map((entry) => entry.icon)).size).toBe(39);
   });
 });

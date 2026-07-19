@@ -1,5 +1,6 @@
 import type {
   ConfigEnvelope,
+  ApplicationCatalog,
   Diagnostic,
   JsonObject,
   JsonSchema,
@@ -46,6 +47,7 @@ export const api = {
   status: () => request<ServerStatus>("/api/v1/status"),
   schema: () => request<JsonSchema>("/api/v1/schema"),
   config: () => request<ConfigEnvelope>("/api/v1/config"),
+  applications: () => request<ApplicationCatalog>("/api/v1/applications"),
   validate: (source: string) =>
     request<ValidationEnvelope>("/api/v1/validate", {
       method: "POST",

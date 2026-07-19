@@ -466,6 +466,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     message: "The shell title source must be readable text."
                 ))
             }
+        case let .pinnedDock(_, applications, _, _):
+            for (index, application) in applications.enumerated() {
+                let pathExists = application.path.map {
+                    FileManager.default.fileExists(atPath: $0)
+                } ?? false
+                guard !pathExists,
+                      NSWorkspace.shared.urlForApplication(
+                        withBundleIdentifier: application.bundleIdentifier
+                      ) == nil
+                else { continue }
+                diagnostics.append(ConfigurationDiagnostic(
+                    severity: .warning,
+                    code: "runtime.applicationMissing",
+                    path: "\(path).applications[\(index)]",
+                    message: "Application not found: \(application.bundleIdentifier). The pinned placeholder will remain visible."
+                ))
+            }
         case let .swipe(_, _, _, sourceApple, sourceBash):
             if let sourceApple {
                 validateAppleScript(sourceApple, path: "\(path).sourceApple", diagnostics: &diagnostics)

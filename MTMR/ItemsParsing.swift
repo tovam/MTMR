@@ -285,6 +285,17 @@ final class SupportedTypesHolder: @unchecked Sendable {
     }
 }
 
+struct PinnedApplicationDefinition: Decodable, Equatable, Sendable {
+    let bundleIdentifier: String
+    let path: String?
+    let label: String?
+}
+
+enum PinnedDockLongPressAction: String, Decodable, Sendable {
+    case none
+    case quit
+}
+
 enum ItemType: Decodable {
     case staticButton(title: String)
     case appleScriptTitledButton(source: SourceProtocol, refreshInterval: Double, alternativeImages: [String: SourceProtocol])
@@ -293,6 +304,12 @@ enum ItemType: Decodable {
     case battery
     case cpu(refreshInterval: Double)
     case dock(autoResize: Bool, filter: String?)
+    case pinnedDock(
+        autoResize: Bool,
+        applications: [PinnedApplicationDefinition],
+        showRunningIndicator: Bool,
+        longPressAction: PinnedDockLongPressAction
+    )
     case volume
     case brightness(refreshInterval: Double)
     case weather(interval: Double, units: String, api_key: String, icon_type: String)
@@ -333,6 +350,9 @@ enum ItemType: Decodable {
         case autoResize
         case width
         case filter
+        case applications
+        case showRunningIndicator
+        case longPressAction
         case disableMarquee
         case alternativeImages
         case sourceApple
@@ -351,6 +371,7 @@ enum ItemType: Decodable {
         case battery
         case cpu
         case dock
+        case pinnedDock
         case volume
         case brightness
         case weather
@@ -408,6 +429,21 @@ enum ItemType: Decodable {
             let autoResize = try container.decodeIfPresent(Bool.self, forKey: .autoResize) ?? !hasManualWidth
             let filterRegexString = try container.decodeIfPresent(String.self, forKey: .filter)
             self = .dock(autoResize: autoResize, filter: filterRegexString)
+
+        case .pinnedDock:
+            // A pinned Dock always follows the explicit JSON order and remains
+            // visible whether each application is currently running or not.
+            let hasManualWidth = container.contains(.width)
+            let autoResize = try container.decodeIfPresent(Bool.self, forKey: .autoResize) ?? !hasManualWidth
+            let applications = try container.decode([PinnedApplicationDefinition].self, forKey: .applications)
+            let showRunningIndicator = try container.decodeIfPresent(Bool.self, forKey: .showRunningIndicator) ?? true
+            let longPressAction = try container.decodeIfPresent(PinnedDockLongPressAction.self, forKey: .longPressAction) ?? .quit
+            self = .pinnedDock(
+                autoResize: autoResize,
+                applications: applications,
+                showRunningIndicator: showRunningIndicator,
+                longPressAction: longPressAction
+            )
 
         case .volume:
             self = .volume

@@ -3,7 +3,7 @@ import Foundation
 struct ConfigValidator {
     static let supportedItemTypes: Set<String> = [
         "staticButton", "appleScriptTitledButton", "shellScriptTitledButton", "timeButton",
-        "battery", "cpu", "dock", "volume", "brightness", "weather", "yandexWeather",
+        "battery", "cpu", "dock", "pinnedDock", "volume", "brightness", "weather", "yandexWeather",
         "currency", "inputsource", "music", "group", "nightShift", "dnd", "pomodoro",
         "network", "darkMode", "swipe", "upnext", "escape", "delete", "brightnessUp",
         "brightnessDown", "illuminationUp", "illuminationDown", "volumeDown", "volumeUp",
@@ -25,6 +25,7 @@ struct ConfigValidator {
         "timeButton": ["formatTemplate", "timeZone", "locale"],
         "cpu": ["refreshInterval"],
         "dock": ["autoResize", "filter"],
+        "pinnedDock": ["autoResize", "applications", "showRunningIndicator", "longPressAction"],
         "brightness": ["refreshInterval"],
         "weather": ["refreshInterval", "units", "api_key", "icon_type"],
         "yandexWeather": ["refreshInterval"],
@@ -38,17 +39,17 @@ struct ConfigValidator {
     ]
 
     private static let allItemKeys = itemSpecificKeys.values.reduce(commonItemKeys, { $0.union($1) })
-    private static let nonActionableItemTypes: Set<String> = ["dock", "volume", "brightness", "group", "swipe", "upnext"]
+    private static let nonActionableItemTypes: Set<String> = ["dock", "pinnedDock", "volume", "brightness", "group", "swipe", "upnext"]
 
     private static let stringItemKeys: Set<String> = [
         "notes", "editorName", "background", "title", "matchAppId", "timeZone", "units", "api_key",
-        "icon_type", "formatTemplate", "locale", "filter", "direction"
+        "icon_type", "formatTemplate", "locale", "filter", "direction", "longPressAction"
     ]
     private static let numberItemKeys: Set<String> = [
         "width", "refreshInterval", "workTime", "restTime", "minOffset", "maxToShow", "fingers"
     ]
     private static let boolItemKeys: Set<String> = [
-        "enabled", "bordered", "full", "flip", "autoResize", "disableMarquee"
+        "enabled", "bordered", "full", "flip", "autoResize", "disableMarquee", "showRunningIndicator"
     ]
     private static let sourceItemKeys: Set<String> = ["source", "image", "sourceApple", "sourceBash"]
 
@@ -199,6 +200,22 @@ struct ConfigValidator {
                 diagnostics.append(error("config.filter", "\(itemPath).filter", "filter must be a valid regular expression."))
             }
 
+            if itemType == "pinnedDock" {
+                validatePinnedApplications(
+                    item["applications"],
+                    path: "\(itemPath).applications",
+                    diagnostics: &diagnostics
+                )
+                if let longPressAction = item["longPressAction"]?.stringValue,
+                   !["none", "quit"].contains(longPressAction) {
+                    diagnostics.append(error(
+                        "config.enum",
+                        "\(itemPath).longPressAction",
+                        "longPressAction must be none or quit."
+                    ))
+                }
+            }
+
             if let identifier = item["timeZone"]?.stringValue,
                TimeZone(identifier: identifier) == nil,
                TimeZone(abbreviation: identifier) == nil {
@@ -286,6 +303,14 @@ struct ConfigValidator {
             if item["items"]?.arrayValue == nil {
                 diagnostics.append(error("config.required", "\(itemPath).items", "group requires an items array."))
             }
+        case "pinnedDock":
+            if item["applications"]?.arrayValue == nil {
+                diagnostics.append(error(
+                    "config.required",
+                    "\(itemPath).applications",
+                    "pinnedDock requires an applications array."
+                ))
+            }
         case "swipe":
             if let direction = item["direction"]?.stringValue, ["left", "right"].contains(direction) {
                 // Valid swipe direction.
@@ -301,6 +326,64 @@ struct ConfigValidator {
             }
         default:
             break
+        }
+    }
+
+    private func validatePinnedApplications(
+        _ value: JSONValue?,
+        path applicationsPath: String,
+        diagnostics: inout [ConfigurationDiagnostic]
+    ) {
+        guard let value else { return }
+        guard case let .array(applications) = value else {
+            diagnostics.append(typeError(applicationsPath, expected: "an array"))
+            return
+        }
+
+        let allowedKeys = Set(["bundleIdentifier", "path", "label"])
+        var seenBundleIdentifiers = Set<String>()
+        for (index, value) in applications.enumerated() {
+            let applicationPath = "\(applicationsPath)[\(index)]"
+            guard case let .object(application) = value else {
+                diagnostics.append(typeError(applicationPath, expected: "an object"))
+                continue
+            }
+            for key in application.keys.sorted() where !allowedKeys.contains(key) {
+                diagnostics.append(error(
+                    "config.unknownKey",
+                    path(applicationPath, key),
+                    "Property ‘\(key)’ is not declared for a pinned application."
+                ))
+            }
+
+            if let bundleIdentifier = application["bundleIdentifier"]?.stringValue,
+               !bundleIdentifier.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                if !seenBundleIdentifiers.insert(bundleIdentifier).inserted {
+                    diagnostics.append(error(
+                        "config.duplicateApplication",
+                        "\(applicationPath).bundleIdentifier",
+                        "Application ‘\(bundleIdentifier)’ is listed more than once in this pinnedDock."
+                    ))
+                }
+            } else {
+                diagnostics.append(error(
+                    "config.required",
+                    "\(applicationPath).bundleIdentifier",
+                    "Every pinned application requires a non-empty bundleIdentifier."
+                ))
+            }
+
+            for key in ["path", "label"] where application[key] != nil && application[key]?.stringValue == nil {
+                diagnostics.append(typeError(path(applicationPath, key), expected: "a string"))
+            }
+            if let appPath = application["path"]?.stringValue,
+               appPath.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                diagnostics.append(error(
+                    "config.required",
+                    "\(applicationPath).path",
+                    "Application path must not be empty when provided."
+                ))
+            }
         }
     }
 

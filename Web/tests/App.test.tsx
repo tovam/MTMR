@@ -126,6 +126,7 @@ describe("éditeur MMTMR", () => {
       if (url.endsWith("/session")) return jsonResponse({ ok: true });
       if (url.endsWith("/status")) return jsonResponse({ version: "1.0", port: 8787, configPath: "/Users/test/.mtmr.json", revision: 4, valid: true });
       if (url.endsWith("/schema")) return jsonResponse(schema);
+      if (url.endsWith("/applications")) return jsonResponse({ applications: [], generatedAt: "2026-07-19T00:00:00Z" });
       if (url.endsWith("/validate")) {
         const source = JSON.parse(String(init?.body)).source as string;
         return jsonResponse({ valid: true, document: JSON.parse(source), diagnostics: [] });
@@ -165,6 +166,105 @@ describe("éditeur MMTMR", () => {
     await user.click(await screen.findByRole("button", { name: "Bonjour" }));
     expect(screen.getByRole("heading", { name: "Bonjour" })).toBeInTheDocument();
     expect(screen.getByDisplayValue("ž")).toBeInTheDocument();
+  });
+
+  it("configure un Dock fixe avec recherche, statuts et réordonnancement", async () => {
+    const user = userEvent.setup();
+    const originalFetch = vi.mocked(fetch).getMockImplementation()!;
+    const pinnedConfig = {
+      formatVersion: 1,
+      items: [{
+        id: "fixed-apps",
+        type: "pinnedDock",
+        editorName: "Mes applications",
+        align: "left",
+        enabled: true,
+        autoResize: true,
+        showRunningIndicator: true,
+        longPressAction: "quit",
+        applications: [{ bundleIdentifier: "com.apple.Terminal" }],
+      }],
+    };
+    const pinnedVariant = {
+      title: "Dock fixe",
+      type: "object",
+      properties: {
+        id: { type: "string", readOnly: true },
+        type: { const: "pinnedDock" },
+        editorName: { type: "string" },
+        align: { type: "string", enum: ["left", "center", "right"] },
+        enabled: { type: "boolean", default: true },
+        autoResize: { type: "boolean", default: true },
+        applications: { type: "array", default: [] },
+        showRunningIndicator: { type: "boolean", default: true },
+        longPressAction: { type: "string", enum: ["none", "quit"], default: "quit" },
+      },
+      required: ["id", "type", "applications"],
+    };
+    const applications = [
+      {
+        bundleIdentifier: "com.apple.Terminal",
+        name: "Terminal",
+        path: "/System/Applications/Utilities/Terminal.app",
+        icon: "data:image/png;base64,dGVzdA==",
+        installed: true,
+        running: true,
+        frontmost: false,
+      },
+      {
+        bundleIdentifier: "org.mozilla.firefox",
+        name: "Firefox",
+        path: "/Applications/Firefox.app",
+        installed: true,
+        running: false,
+        frontmost: false,
+      },
+    ];
+    vi.mocked(fetch).mockImplementation(async (input, init) => {
+      const url = String(input);
+      if (url.endsWith("/schema")) {
+        return jsonResponse({
+          ...schema,
+          properties: {
+            ...schema.properties,
+            items: {
+              ...schema.properties.items,
+              items: {
+                ...schema.properties.items.items,
+                oneOf: [...schema.properties.items.items.oneOf, pinnedVariant],
+              },
+            },
+          },
+        });
+      }
+      if (url.endsWith("/applications")) {
+        return jsonResponse({ applications, generatedAt: "2026-07-19T00:00:00Z" });
+      }
+      if (url.endsWith("/config") && init?.method !== "PUT") {
+        return jsonResponse({ source: `${JSON.stringify(pinnedConfig, null, 2)}\n`, document: pinnedConfig, revision: 4, diagnostics: [], valid: true });
+      }
+      return originalFetch(input, init);
+    });
+
+    render(<App />);
+    await user.click(await screen.findByRole("button", { name: "Dock fixe" }));
+    expect(await screen.findByText("Terminal")).toBeInTheDocument();
+    expect(screen.getByText("ouverte")).toBeInTheDocument();
+    await user.type(screen.getByPlaceholderText("Nom, identifiant ou dossier…"), "fire");
+    expect(screen.getByRole("option", { name: "Firefox — fermée" })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Ajouter l’application sélectionnée" }));
+    expect(await screen.findByText("org.mozilla.firefox")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Monter Firefox" }));
+
+    await waitFor(() => {
+      const putCalls = vi.mocked(fetch).mock.calls.filter(([, init]) => init?.method === "PUT");
+      const put = putCalls[putCalls.length - 1];
+      expect(put).toBeDefined();
+      const body = JSON.parse(String(put?.[1]?.body));
+      const saved = JSON.parse(body.source);
+      expect(saved.items[0].applications.map((application: { bundleIdentifier: string }) => application.bundleIdentifier))
+        .toEqual(["org.mozilla.firefox", "com.apple.Terminal"]);
+    }, { timeout: 2_500 });
   });
 
   it("reste compatible avec un ancien schéma qui ne connaît pas editorName", async () => {

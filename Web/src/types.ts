@@ -12,6 +12,12 @@ export interface ActionConfig extends JsonObject {
   action: string;
 }
 
+export interface PinnedApplicationConfig extends JsonObject {
+  bundleIdentifier: string;
+  path?: string;
+  label?: string;
+}
+
 export interface ItemConfig extends JsonObject {
   id: string;
   type: string;
@@ -22,6 +28,7 @@ export interface ItemConfig extends JsonObject {
   enabled?: boolean;
   actions?: ActionConfig[];
   items?: ItemConfig[];
+  applications?: PinnedApplicationConfig[];
 }
 
 export interface ConfigDocument extends JsonObject {
@@ -55,6 +62,21 @@ export interface ConfigEnvelope {
   revision: number;
   diagnostics: Diagnostic[];
   valid: boolean;
+}
+
+export interface ApplicationDescriptor {
+  bundleIdentifier: string;
+  name: string;
+  path: string;
+  icon?: string;
+  installed: boolean;
+  running: boolean;
+  frontmost: boolean;
+}
+
+export interface ApplicationCatalog {
+  applications: ApplicationDescriptor[];
+  generatedAt: string;
 }
 
 export interface ValidationEnvelope {

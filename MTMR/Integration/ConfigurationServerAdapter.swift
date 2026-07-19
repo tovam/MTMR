@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 
 /// Bridges the strict configuration owner to the transport-only editor server.
@@ -93,6 +94,10 @@ final class ConfigurationServerAdapter: ServerConfigurationProviding, @unchecked
         }
     }
 
+    func applicationCatalog() async throws -> ServerApplicationCatalog {
+        await InstalledApplicationCatalog.shared.snapshot()
+    }
+
     func serverSnapshot(_ snapshot: ConfigurationSnapshot) -> ServerConfigurationSnapshot {
         ServerConfigurationSnapshot(
             source: snapshot.source,
@@ -137,5 +142,119 @@ final class ConfigurationServerAdapter: ServerConfigurationProviding, @unchecked
             line: diagnostic.line,
             column: diagnostic.column
         )
+    }
+}
+
+/// Produces a read-only catalog from macOS' standard application folders. The
+/// HTTP endpoint never accepts a path, so it cannot be repurposed as a general
+/// filesystem browser.
+@MainActor
+private final class InstalledApplicationCatalog {
+    static let shared = InstalledApplicationCatalog()
+
+    private struct InstalledApplication {
+        let bundleIdentifier: String
+        let name: String
+        let path: String
+        let icon: String?
+    }
+
+    private var cachedApplications: [InstalledApplication] = []
+    private var cacheDate: Date?
+    private let cacheLifetime: TimeInterval = 60
+
+    func snapshot() -> ServerApplicationCatalog {
+        if cacheDate.map({ Date().timeIntervalSince($0) >= cacheLifetime }) != false {
+            cachedApplications = scanApplications()
+            cacheDate = Date()
+        }
+
+        let runningIdentifiers = Set(
+            NSWorkspace.shared.runningApplications.compactMap(\.bundleIdentifier)
+        )
+        let frontmostIdentifier = NSWorkspace.shared.frontmostApplication?.bundleIdentifier
+        return ServerApplicationCatalog(applications: cachedApplications.map { application in
+            ServerApplicationDescriptor(
+                bundleIdentifier: application.bundleIdentifier,
+                name: application.name,
+                path: application.path,
+                icon: application.icon,
+                installed: true,
+                running: runningIdentifiers.contains(application.bundleIdentifier),
+                frontmost: frontmostIdentifier == application.bundleIdentifier
+            )
+        })
+    }
+
+    private func scanApplications() -> [InstalledApplication] {
+        let fileManager = FileManager.default
+        let roots = [
+            fileManager.homeDirectoryForCurrentUser.appendingPathComponent("Applications", isDirectory: true),
+            URL(fileURLWithPath: "/Applications", isDirectory: true),
+            URL(fileURLWithPath: "/System/Applications", isDirectory: true),
+            URL(fileURLWithPath: "/System/Library/CoreServices", isDirectory: true),
+        ]
+        var applicationsByIdentifier: [String: InstalledApplication] = [:]
+
+        for root in roots where fileManager.fileExists(atPath: root.path) {
+            guard let enumerator = fileManager.enumerator(
+                at: root,
+                includingPropertiesForKeys: [.isDirectoryKey],
+                options: [.skipsHiddenFiles, .skipsPackageDescendants],
+                errorHandler: { _, _ in true }
+            ) else { continue }
+
+            for case let url as URL in enumerator {
+                guard url.pathExtension.caseInsensitiveCompare("app") == .orderedSame else { continue }
+                enumerator.skipDescendants()
+                guard applicationsByIdentifier.count < 1_000,
+                      let bundle = Bundle(url: url),
+                      let bundleIdentifier = bundle.bundleIdentifier?.trimmingCharacters(in: .whitespacesAndNewlines),
+                      !bundleIdentifier.isEmpty,
+                      applicationsByIdentifier[bundleIdentifier] == nil
+                else { continue }
+
+                let localized = bundle.localizedInfoDictionary
+                let name = (localized?["CFBundleDisplayName"] as? String)
+                    ?? (localized?["CFBundleName"] as? String)
+                    ?? (bundle.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String)
+                    ?? (bundle.object(forInfoDictionaryKey: "CFBundleName") as? String)
+                    ?? url.deletingPathExtension().lastPathComponent
+                let icon = Self.iconDataURL(NSWorkspace.shared.icon(forFile: url.path))
+                applicationsByIdentifier[bundleIdentifier] = InstalledApplication(
+                    bundleIdentifier: bundleIdentifier,
+                    name: name,
+                    path: url.path,
+                    icon: icon
+                )
+            }
+        }
+
+        return applicationsByIdentifier.values.sorted { left, right in
+            let order = left.name.localizedCaseInsensitiveCompare(right.name)
+            return order == .orderedSame
+                ? left.bundleIdentifier < right.bundleIdentifier
+                : order == .orderedAscending
+        }
+    }
+
+    private static func iconDataURL(_ source: NSImage) -> String? {
+        let size = NSSize(width: 56, height: 56)
+        let image = NSImage(size: size)
+        image.lockFocus()
+        NSGraphicsContext.current?.imageInterpolation = .high
+        source.draw(
+            in: NSRect(origin: .zero, size: size),
+            from: NSRect(origin: .zero, size: source.size),
+            operation: .sourceOver,
+            fraction: 1
+        )
+        image.unlockFocus()
+        guard let tiff = image.tiffRepresentation,
+              let bitmap = NSBitmapImageRep(data: tiff),
+              let png = bitmap.representation(using: .png, properties: [:]),
+              png.count <= 96 * 1_024
+        else { return nil }
+        return "data:image/png;base64,\(png.base64EncodedString())"
     }
 }

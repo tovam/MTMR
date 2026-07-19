@@ -140,6 +140,29 @@ enum ServerConfigurationWriteResult: Sendable {
     case invalid(ServerValidationResult)
 }
 
+struct ServerApplicationDescriptor: Codable, Equatable, Sendable {
+    let bundleIdentifier: String
+    let name: String
+    let path: String
+    let icon: String?
+    let installed: Bool
+    let running: Bool
+    let frontmost: Bool
+}
+
+struct ServerApplicationCatalog: Codable, Equatable, Sendable {
+    let applications: [ServerApplicationDescriptor]
+    let generatedAt: String
+
+    init(
+        applications: [ServerApplicationDescriptor],
+        generatedAt: String = ISO8601DateFormatter().string(from: Date())
+    ) {
+        self.applications = applications
+        self.generatedAt = generatedAt
+    }
+}
+
 /// The only configuration-core contract required by the embedded editor server.
 ///
 /// Implementations are expected to serialize mutations internally. In particular,
@@ -150,6 +173,13 @@ protocol ServerConfigurationProviding: Sendable {
     func configurationSchema() async throws -> ServerJSONValue
     func validateConfiguration(source: String) async throws -> ServerValidationResult
     func replaceConfiguration(source: String, expectedRevision: Int) async throws -> ServerConfigurationWriteResult
+    func applicationCatalog() async throws -> ServerApplicationCatalog
+}
+
+extension ServerConfigurationProviding {
+    func applicationCatalog() async throws -> ServerApplicationCatalog {
+        ServerApplicationCatalog(applications: [])
+    }
 }
 
 struct ServerEvent: Codable, Equatable, Sendable {

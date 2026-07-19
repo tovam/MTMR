@@ -105,6 +105,19 @@ struct EditorServerController: Sendable {
             }
         }
 
+        router.get("/api/v1/applications") { request, _ in
+            guard security.allowsAPIRequest(request, requiresOrigin: false) else {
+                return forbiddenResponse()
+            }
+            do {
+                var response = jsonResponse(try await provider.applicationCatalog())
+                response.headers[.cacheControl] = "no-store"
+                return response
+            } catch {
+                return await providerFailureResponse(error)
+            }
+        }
+
         router.post("/api/v1/validate") { request, _ in
             guard security.allowsAPIRequest(request, requiresOrigin: true) else {
                 return forbiddenResponse()

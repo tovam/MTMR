@@ -139,6 +139,17 @@ final class MMTMREditorServerTests: XCTestCase {
             let json = try Self.decodeJSON(status.body)
             XCTAssertEqual(json.objectValue?["port"], .number(8787))
             XCTAssertEqual(json.objectValue?["configPath"], .string("build-checks/test-home/.mtmr.json"))
+
+            let applications = try await client.execute(
+                uri: "/api/v1/applications",
+                method: .get,
+                headers: Self.authenticatedHeaders(cookie: cookie)
+            )
+            XCTAssertEqual(applications.status, .ok)
+            XCTAssertEqual(
+                try Self.decodeJSON(applications.body).objectValue?["applications"]?.arrayValue?.first?.objectValue?["bundleIdentifier"],
+                .string("com.apple.Terminal")
+            )
         }
     }
 
@@ -388,6 +399,21 @@ private actor EditorServerTestProvider: ServerConfigurationProviding {
         revision += 1
         self.source = source
         return .accepted(snapshot())
+    }
+
+    func applicationCatalog() -> ServerApplicationCatalog {
+        ServerApplicationCatalog(
+            applications: [ServerApplicationDescriptor(
+                bundleIdentifier: "com.apple.Terminal",
+                name: "Terminal",
+                path: "/System/Applications/Utilities/Terminal.app",
+                icon: nil,
+                installed: true,
+                running: false,
+                frontmost: false
+            )],
+            generatedAt: "2026-07-19T00:00:00Z"
+        )
     }
 
     func replaceCallCount() -> Int { replaceCalls }

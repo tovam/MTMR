@@ -71,6 +71,28 @@ Chaque item possède un `id` stable et unique. Cet identifiant est utilisé par 
 
 Les chemins relatifs sont résolus depuis le dossier contenant le fichier de configuration. Les chemins commençant par `~/` restent acceptés.
 
+### Dock d’applications fixe
+
+`pinnedDock` affiche exactement les applications déclarées, dans le même ordre, qu’elles soient ouvertes ou fermées. Un toucher active une application ouverte ou lance une application fermée. L’éditeur propose un catalogue visuel, une recherche et un réordonnancement ; le JSON reste la seule source de vérité.
+
+```json
+{
+  "id": "applications-principales",
+  "type": "pinnedDock",
+  "align": "left",
+  "autoResize": true,
+  "showRunningIndicator": true,
+  "longPressAction": "quit",
+  "applications": [
+    { "bundleIdentifier": "org.mozilla.firefox" },
+    { "bundleIdentifier": "com.apple.Terminal", "label": "Terminal" },
+    { "bundleIdentifier": "md.obsidian", "path": "/Applications/Obsidian.app" }
+  ]
+}
+```
+
+`path` est un chemin de secours facultatif. Une application introuvable conserve une icône générique dans la Touch Bar et produit un avertissement sans invalider toute la configuration.
+
 ### Premier lancement et migration
 
 Si `~/.mtmr.json` n’existe pas, MMTMR importe le premier fichier disponible dans cet ordre :
@@ -119,6 +141,7 @@ Routes :
 - `GET /api/v1/status` ;
 - `GET /api/v1/schema` ;
 - `GET /api/v1/config` ;
+- `GET /api/v1/applications` (catalogue limité aux dossiers d’applications macOS standard) ;
 - `POST /api/v1/validate` ;
 - `PUT /api/v1/config` avec `If-Match` ;
 - `POST /api/v1/preview/context` ;

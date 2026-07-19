@@ -25,6 +25,7 @@ enum MMTMRConfigurationSchema {
         "$defs": .object([
             "source": sourceDefinition,
             "action": actionDefinition,
+            "pinnedApplication": pinnedApplicationDefinition,
             "item": itemDefinition,
         ]),
     ])
@@ -69,6 +70,22 @@ enum MMTMRConfigurationSchema {
         ]),
     ])
 
+    private static let pinnedApplicationDefinition: JSON = .object([
+        "title": .string("Pinned application"),
+        "type": .string("object"),
+        "additionalProperties": .bool(false),
+        "required": strings("bundleIdentifier"),
+        "properties": .object([
+            "bundleIdentifier": .object([
+                "type": .string("string"),
+                "minLength": .number(1),
+                "description": .string("Stable macOS application bundle identifier."),
+            ]),
+            "path": stringProperty("Optional application path, supporting ~ and configuration-relative paths."),
+            "label": stringProperty("Optional editor and accessibility label."),
+        ]),
+    ])
+
     private static let itemDefinition: JSON = .object([
         "oneOf": .array([
             itemVariant("staticButton", title: "Static button", fields: [
@@ -97,6 +114,16 @@ enum MMTMRConfigurationSchema {
                 "autoResize": boolProperty(defaultValue: true),
                 "filter": stringProperty("Application bundle-id regular expression."),
             ]),
+            itemVariant("pinnedDock", title: "Pinned applications", fields: [
+                "autoResize": boolProperty(defaultValue: true),
+                "applications": .object([
+                    "type": .string("array"),
+                    "items": reference("#/$defs/pinnedApplication"),
+                    "default": .array([]),
+                ]),
+                "showRunningIndicator": boolProperty(defaultValue: true),
+                "longPressAction": enumProperty("none", "quit", defaultValue: "quit"),
+            ], required: ["applications"]),
             itemVariant("volume", title: "Volume"),
             itemVariant("brightness", title: "Brightness", fields: ["refreshInterval": numberProperty(defaultValue: 0.5, minimum: 0.001)]),
             itemVariant("weather", title: "Weather", fields: [
@@ -179,7 +206,7 @@ enum MMTMRConfigurationSchema {
         ])
     }
 
-    private static let nonActionableItemTypes: Set<String> = ["dock", "volume", "brightness", "group", "swipe", "upnext"]
+    private static let nonActionableItemTypes: Set<String> = ["dock", "pinnedDock", "volume", "brightness", "group", "swipe", "upnext"]
 
     private static func commonItemProperties(includeActions: Bool) -> [String: JSON] {
         var properties: [String: JSON] = [

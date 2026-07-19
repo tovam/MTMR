@@ -234,6 +234,51 @@ h3 { margin: 2px 0 0; font-size: 14px; }
 .group-child-icon { width: 28px; height: 26px; flex: none; display: grid; place-items: center; border-right: 1px solid var(--line-soft); }
 .group-child-icon .media-control-icon { width: 25px; height: 18px; }
 .group-drop-indicator { height: 3px; margin: -2px 2px; border-radius: 999px; background: var(--drop-red); box-shadow: 0 0 5px rgba(255, 59, 48, .55); }
+
+.pinned-dock-editor { margin: 10px 0 4px; padding: 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel-raised); box-shadow: inset 0 1px rgba(255, 255, 255, .78); }
+.pinned-dock-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 9px; }
+.pinned-dock-heading > div { min-width: 0; display: flex; flex-direction: column; }
+.pinned-dock-heading strong { font-size: 11px; }
+.pinned-dock-heading small { color: var(--text-faint); font-size: 9px; }
+.pinned-app-picker { padding: 9px; border: 1px solid var(--line-soft); border-radius: 7px; background: var(--field); }
+.pinned-app-picker .property-field { gap: 5px; }
+.pinned-app-select-row { min-width: 0; display: grid; grid-template-columns: 34px minmax(0, 1fr) auto; align-items: center; gap: 6px; margin-top: 7px; }
+.pinned-app-select-row select { width: 100%; min-width: 0; height: 30px; border: 1px solid #b5bbc0; border-radius: 4px; background: var(--panel-raised); color: var(--text); padding: 0 5px; font-size: 10px; }
+.pinned-app-select-preview { width: 34px; height: 34px; display: grid; place-items: center; border: 1px solid var(--line); border-radius: 7px; background: var(--panel); }
+.pinned-catalog-meta { min-height: 17px; margin-top: 6px; display: flex; align-items: center; justify-content: space-between; gap: 8px; color: var(--text-faint); font-size: 8px; }
+.pinned-catalog-meta > span { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.pinned-app-list { min-height: 1px; margin-top: 8px; display: flex; flex-direction: column; gap: 5px; }
+.pinned-app-entry { min-width: 0; position: relative; }
+.pinned-app-card { min-width: 0; display: grid; grid-template-columns: 13px 34px minmax(0, 1fr) auto; align-items: center; gap: 7px; padding: 7px; border: 1px solid var(--line); border-radius: 7px; background: var(--panel); box-shadow: 0 1px 2px rgba(52, 60, 67, .04); }
+.pinned-app-card:hover { border-color: #aeb4b9; background: #fafbfb; }
+.pinned-app-card.is-dragging { opacity: .42; }
+.pinned-app-grip { color: var(--text-faint); cursor: grab; font-size: 12px; }
+.pinned-app-grip:active { cursor: grabbing; }
+.pinned-app-icon { width: 30px; height: 30px; object-fit: contain; }
+.pinned-app-icon-missing { display: grid; place-items: center; border: 1px dashed #adb4ba; border-radius: 7px; background: #e7eaec; color: var(--text-faint); font: 600 12px var(--font-ui); }
+.pinned-app-identity { min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.pinned-app-identity strong, .pinned-app-identity code { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.pinned-app-identity strong { font-size: 10px; }
+.pinned-app-identity code { color: var(--text-faint); font-size: 7px; }
+.pinned-app-status { grid-column: 3; width: max-content; max-width: 100%; padding: 2px 5px; border: 1px solid var(--line); border-radius: 999px; color: var(--text-faint); background: var(--field); font-size: 7px; white-space: nowrap; }
+.pinned-app-status.running { color: #1e6e42; border-color: #8fbea5; background: #edf7f1; }
+.pinned-app-status.frontmost { color: #0757a6; border-color: #8eb6dc; background: #edf5fc; }
+.pinned-app-status.missing { color: #8a2630; border-color: #d2a0a5; background: #faeeee; }
+.pinned-app-row-actions { grid-column: 4; grid-row: 1 / span 2; display: flex; align-items: center; gap: 3px; }
+.pinned-app-row-actions .icon-button { width: 22px; height: 22px; font-size: 10px; }
+.pinned-app-row-actions .pinned-remove { color: var(--red); }
+.pinned-app-details { grid-column: 2 / -1; margin-top: 2px; border-top: 1px solid var(--line-soft); padding-top: 5px; }
+.pinned-app-details summary, .pinned-manual-add summary { width: max-content; max-width: 100%; color: var(--blue-deep); font-size: 8px; cursor: pointer; }
+.pinned-app-details[open] { display: grid; grid-template-columns: 1fr; gap: 7px; }
+.pinned-app-details[open] summary { margin-bottom: 2px; }
+.pinned-app-details .property-field input { height: 27px !important; font-size: 9px; }
+.pinned-app-drop-line { height: 3px; margin: -1px 3px 3px; border-radius: 999px; background: var(--drop-red); box-shadow: 0 0 5px rgba(255, 59, 48, .46); }
+.pinned-manual-add { margin-top: 8px; padding: 8px; border: 1px dashed #b9bfc4; border-radius: 6px; background: var(--field); }
+.pinned-manual-add p { margin: 6px 0; color: var(--text-faint); font-size: 8px; }
+.pinned-manual-row { display: flex; gap: 5px; }
+.pinned-manual-row input { min-width: 0; flex: 1; height: 28px; border: 1px solid #b5bbc0; border-radius: 4px; padding: 0 6px; background: var(--panel); color: var(--text); font: 9px var(--font-mono); }
+.pinned-long-press { margin-top: 9px; padding-top: 9px; border-top: 1px solid var(--line-soft); }
+.pinned-long-press select { background: var(--panel) !important; }
 .json-panel { position: absolute; inset: 0; display: flex; min-height: 0; overflow: hidden; }
 .code-editor { min-width: 0; flex: 1; height: 100%; overflow: hidden; }
 .json-diagnostic-strip { flex: none; width: min(310px, 34%); overflow-y: auto; padding: 10px; border-left: 1px solid var(--line); background: var(--panel); }

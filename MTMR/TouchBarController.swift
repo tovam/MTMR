@@ -39,6 +39,7 @@ extension ItemType {
         case .battery: return "battery"
         case .cpu(refreshInterval: _): return "cpu"
         case .dock(autoResize: _, filter: _): return "dock"
+        case .pinnedDock(autoResize: _, applications: _, showRunningIndicator: _, longPressAction: _): return "pinnedDock"
         case .volume: return "volume"
         case .brightness(refreshInterval: _): return "brightness"
         case .weather(interval: _, units: _, api_key: _, icon_type: _): return "weather"
@@ -73,6 +74,8 @@ extension ItemType {
             return "com.tovam.MMTMR.cpu."
         case .dock(autoResize: _, filter: _):
             return "com.tovam.MMTMR.dock"
+        case .pinnedDock(autoResize: _, applications: _, showRunningIndicator: _, longPressAction: _):
+            return "com.tovam.MMTMR.pinnedDock"
         case .volume:
             return "com.tovam.MMTMR.volume"
         case .brightness(refreshInterval: _):
@@ -676,6 +679,14 @@ class TouchBarController: NSObject, NSTouchBarDelegate {
             } else {
                 barItem = AppScrubberTouchBarItem(identifier: identifier, autoResize: autoResize)
             }
+        case let .pinnedDock(autoResize, applications, showRunningIndicator, longPressAction):
+            barItem = PinnedAppDockTouchBarItem(
+                identifier: identifier,
+                autoResize: autoResize,
+                applications: applications,
+                showRunningIndicator: showRunningIndicator,
+                longPressAction: longPressAction
+            )
         case .volume:
             if case let .image(source)? = item.additionalParameters[.image] {
                 barItem = VolumeViewController(identifier: identifier, image: source.image)

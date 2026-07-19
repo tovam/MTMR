@@ -64,6 +64,45 @@ final class ConfigurationCoreTests: XCTestCase {
         XCTAssertTrue(result.diagnostics.contains(where: { $0.code == "config.unknownItemType" }))
     }
 
+    func testPinnedDockValidationAndRelativeFallbackPath() throws {
+        let duplicate = codec.decode(#"""
+        {
+          "formatVersion": 1,
+          "items": [{
+            "id": "fixed-apps",
+            "type": "pinnedDock",
+            "applications": [
+              {"bundleIdentifier":"com.apple.Terminal"},
+              {"bundleIdentifier":"com.apple.Terminal","unknown":true}
+            ],
+            "longPressAction": "explode"
+          }]
+        }
+        """#)
+        XCTAssertFalse(duplicate.isValid)
+        XCTAssertTrue(duplicate.diagnostics.contains { $0.code == "config.duplicateApplication" })
+        XCTAssertTrue(duplicate.diagnostics.contains { $0.code == "config.unknownKey" && $0.path.hasSuffix(".unknown") })
+        XCTAssertTrue(duplicate.diagnostics.contains { $0.code == "config.enum" && $0.path.hasSuffix(".longPressAction") })
+
+        let valid = codec.decode(#"""
+        {
+          "formatVersion": 1,
+          "items": [{
+            "id": "fixed-apps",
+            "type": "pinnedDock",
+            "applications": [{"bundleIdentifier":"com.example.App","path":"Apps/Example.app"}]
+          }]
+        }
+        """#)
+        let document = try XCTUnwrap(valid.document)
+        let runtime = try XCTUnwrap(document.runtimeItems(
+            relativeTo: URL(fileURLWithPath: "/project/config/.mtmr.json")
+        ).first)
+        let runtimeJSON = try JSONDecoder().decode(JSONValue.self, from: runtime.data)
+        let application = try XCTUnwrap(runtimeJSON.objectValue?["applications"]?.arrayValue?.first?.objectValue)
+        XCTAssertEqual(application["path"]?.stringValue, "/project/config/Apps/Example.app")
+    }
+
     func testInvalidMatchApplicationPatternIsRejected() {
         let result = codec.decode(#"""
         {

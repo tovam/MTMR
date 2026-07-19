@@ -116,6 +116,28 @@ class ParseConfig: XCTestCase {
         XCTAssertEqual(automaticValues, [true, false, true, false])
     }
 
+    func testPinnedDockKeepsExplicitApplicationOrderAndDefaults() throws {
+        let fixture = #"""
+            [{
+              "type": "pinnedDock",
+              "applications": [
+                {"bundleIdentifier":"org.mozilla.firefox"},
+                {"bundleIdentifier":"com.apple.Terminal","label":"Terminal","path":"/Applications/Terminal.app"}
+              ]
+            }]
+        """#.data(using: .utf8)!
+
+        let item = try XCTUnwrap(JSONDecoder().decode([BarItemDefinition].self, from: fixture).first)
+        guard case let .pinnedDock(autoResize, applications, showRunningIndicator, longPressAction) = item.type else {
+            return XCTFail("Expected a pinnedDock runtime item")
+        }
+        XCTAssertTrue(autoResize)
+        XCTAssertTrue(showRunningIndicator)
+        XCTAssertEqual(longPressAction, .quit)
+        XCTAssertEqual(applications.map(\.bundleIdentifier), ["org.mozilla.firefox", "com.apple.Terminal"])
+        XCTAssertEqual(applications.last?.label, "Terminal")
+    }
+
     func testExtendedWidthForPredefinedItem() {
         let buttonKeycodeFixture = """
             [  { "type": "escape", "width": 110} ]

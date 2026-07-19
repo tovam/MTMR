@@ -196,6 +196,193 @@ class AppScrubberTouchBarItem: NSCustomTouchBarItem {
     }
 }
 
+/// A deterministic Dock whose content and order come exclusively from the
+/// canonical JSON configuration. Unlike `AppScrubberTouchBarItem`, entries do
+/// not disappear when their applications terminate.
+class PinnedAppDockTouchBarItem: NSCustomTouchBarItem {
+    private let scrollView = NSScrollView()
+    private let autoResize: Bool
+    private let definitions: [PinnedApplicationDefinition]
+    private let showRunningIndicator: Bool
+    private let longPressAction: PinnedDockLongPressAction
+    private var widthConstraint: NSLayoutConstraint?
+    private var items: [DockBarItem] = []
+
+    init(
+        identifier: NSTouchBarItem.Identifier,
+        autoResize: Bool,
+        applications: [PinnedApplicationDefinition],
+        showRunningIndicator: Bool,
+        longPressAction: PinnedDockLongPressAction
+    ) {
+        self.autoResize = autoResize
+        definitions = applications
+        self.showRunningIndicator = showRunningIndicator
+        self.longPressAction = longPressAction
+        super.init(identifier: identifier)
+        view = scrollView
+
+        let notifications = NSWorkspace.shared.notificationCenter
+        notifications.addObserver(
+            self,
+            selector: #selector(applicationListChanged),
+            name: NSWorkspace.didLaunchApplicationNotification,
+            object: nil
+        )
+        notifications.addObserver(
+            self,
+            selector: #selector(applicationListChanged),
+            name: NSWorkspace.didTerminateApplicationNotification,
+            object: nil
+        )
+        notifications.addObserver(
+            self,
+            selector: #selector(updateApplicationState),
+            name: NSWorkspace.didActivateApplicationNotification,
+            object: nil
+        )
+
+        reloadItems()
+    }
+
+    deinit {
+        NSWorkspace.shared.notificationCenter.removeObserver(self)
+    }
+
+    required init?(coder _: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    @objc private func applicationListChanged() {
+        // Re-resolve the icon as well: this turns a missing placeholder into
+        // the real application icon as soon as macOS can launch it.
+        reloadItems()
+    }
+
+    private func reloadItems() {
+        items = definitions.map(createAppButton)
+        let stackView = NSStackView(views: items.map(\.view))
+        stackView.spacing = 1
+        stackView.orientation = .horizontal
+        let visibleOrigin = scrollView.documentVisibleRect.origin
+        scrollView.documentView = stackView
+        stackView.scroll(visibleOrigin)
+        updateApplicationState()
+        updateSize()
+    }
+
+    private func createAppButton(for definition: PinnedApplicationDefinition) -> DockBarItem {
+        let runningApplication = runningApplication(for: definition.bundleIdentifier)
+        let applicationURL = resolvedApplicationURL(for: definition)
+        let icon: NSImage
+        if let runningIcon = runningApplication?.icon {
+            icon = runningIcon
+        } else if let applicationURL {
+            icon = NSWorkspace.shared.icon(forFile: applicationURL.path)
+        } else {
+            icon = Self.missingApplicationIcon()
+        }
+
+        let dockItem = DockItem(
+            bundleIdentifier: definition.bundleIdentifier,
+            icon: icon,
+            pid: runningApplication?.processIdentifier
+        )
+        let item = DockBarItem(dockItem)
+        item.isBordered = false
+        item.showsRunningIndicator = showRunningIndicator
+        item.allowsKillGesture = longPressAction == .quit
+        item.view.toolTip = definition.label ?? runningApplication?.localizedName ?? definition.bundleIdentifier
+        item.actions.append(ItemAction(trigger: .singleTap) { [weak self] in
+            self?.openOrActivate(definition)
+        })
+        item.killAppClosure = { [weak self] in
+            self?.quitApplication(definition.bundleIdentifier)
+        }
+        return item
+    }
+
+    @objc private func updateApplicationState() {
+        let running = NSWorkspace.shared.runningApplications.reduce(
+            into: [String: NSRunningApplication]()
+        ) { result, application in
+            guard let identifier = application.bundleIdentifier else { return }
+            result[identifier] = result[identifier] ?? application
+        }
+        let frontmostIdentifier = NSWorkspace.shared.frontmostApplication?.bundleIdentifier
+        for item in items {
+            let identifier = item.dockItem.bundleIdentifier ?? ""
+            let application = running[identifier]
+            item.dockItem.pid = application?.processIdentifier
+            item.isRunning = application != nil
+            item.isFrontmost = identifier == frontmostIdentifier
+        }
+    }
+
+    private func updateSize() {
+        let hasManualWidth = scrollView.constraints.contains { constraint in
+            constraint.isActive
+                && constraint !== widthConstraint
+                && constraint.priority == .required
+                && constraint.relation == .equal
+                && constraint.secondItem == nil
+                && constraint.firstItem === scrollView
+                && constraint.firstAttribute == .width
+        }
+        if autoResize || !hasManualWidth {
+            widthConstraint?.isActive = false
+            let width = scrollView.documentView?.fittingSize.width ?? 0
+            widthConstraint = scrollView.widthAnchor.constraint(equalToConstant: width)
+            widthConstraint?.priority = .defaultHigh
+            widthConstraint?.isActive = true
+        }
+        NotificationCenter.default.post(name: .mmtmrTouchBarContentSizeDidChange, object: self)
+    }
+
+    private func openOrActivate(_ definition: PinnedApplicationDefinition) {
+        if let application = runningApplication(for: definition.bundleIdentifier) {
+            application.activate(options: [.activateIgnoringOtherApps])
+            updateApplicationState()
+            return
+        }
+
+        guard let applicationURL = resolvedApplicationURL(for: definition) else {
+            NSSound.beep()
+            return
+        }
+        let configuration = NSWorkspace.OpenConfiguration()
+        configuration.activates = true
+        NSWorkspace.shared.openApplication(at: applicationURL, configuration: configuration) { [weak self] _, _ in
+            DispatchQueue.main.async { self?.applicationListChanged() }
+        }
+    }
+
+    private func quitApplication(_ bundleIdentifier: String) {
+        guard longPressAction == .quit,
+              let application = runningApplication(for: bundleIdentifier)
+        else { return }
+        if !application.terminate() {
+            application.forceTerminate()
+        }
+    }
+
+    private func runningApplication(for bundleIdentifier: String) -> NSRunningApplication? {
+        NSWorkspace.shared.runningApplications.first { $0.bundleIdentifier == bundleIdentifier }
+    }
+
+    private func resolvedApplicationURL(for definition: PinnedApplicationDefinition) -> URL? {
+        if let path = definition.path, FileManager.default.fileExists(atPath: path) {
+            return URL(fileURLWithPath: path, isDirectory: true)
+        }
+        return NSWorkspace.shared.urlForApplication(withBundleIdentifier: definition.bundleIdentifier)
+    }
+
+    private static func missingApplicationIcon() -> NSImage {
+        let path = "/System/Library/CoreServices/CoreTypes.bundle/Contents/Resources/GenericApplicationIcon.icns"
+        return NSImage(contentsOfFile: path) ?? NSImage(size: NSSize(width: iconWidth, height: iconWidth))
+    }
+}
+
 public class DockItem: NSObject {
     var bundleIdentifier: String!, icon: NSImage!, pid: Int32!
 
@@ -213,10 +400,19 @@ class DockBarItem: CustomButtonTouchBarItem {
     let dockItem: DockItem
     fileprivate var killGestureRecognizer: LongPressGestureRecognizer!
     var killAppClosure: () -> Void = { }
+
+    var showsRunningIndicator = true {
+        didSet { redrawDotView() }
+    }
+
+    var allowsKillGesture = true {
+        didSet { updateKillGestureState() }
+    }
     
     var isRunning = false {
         didSet {
             redrawDotView()
+            updateKillGestureState()
         }
     }
     
@@ -250,9 +446,14 @@ class DockBarItem: CustomButtonTouchBarItem {
     }
     
     func redrawDotView() {
-        dotView.layer?.backgroundColor = isRunning ? NSColor.white.cgColor : NSColor.clear.cgColor
-        dotView.frame.size = NSSize(width: isFrontmost ? iconWidth - 14 : 3, height: 3)
+        let visible = showsRunningIndicator && isRunning
+        dotView.layer?.backgroundColor = visible ? NSColor.white.cgColor : NSColor.clear.cgColor
+        dotView.frame.size = NSSize(width: visible && isFrontmost ? iconWidth - 14 : 3, height: 3)
         dotView.setFrameOrigin(NSPoint(x: 18.0 - Double(dotView.frame.size.width) / 2.0, y: iconWidth - 5))
+    }
+
+    private func updateKillGestureState() {
+        killGestureRecognizer?.isEnabled = allowsKillGesture && isRunning
     }
     
     @objc func firePanGestureRecognizer() {
