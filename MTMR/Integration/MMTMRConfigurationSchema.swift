@@ -111,9 +111,13 @@ enum MMTMRConfigurationSchema {
             itemVariant("battery", title: "Battery"),
             itemVariant("cpu", title: "CPU usage", fields: [
                 "refreshInterval": systemUsageRefreshProperty,
+                "bordered": systemUsageLegacyBorderedProperty,
+                "actions": systemUsageLegacyActionsProperty,
             ], excludedCommonFields: systemUsageExcludedFields),
             itemVariant("memory", title: "Memory usage", fields: [
                 "refreshInterval": systemUsageRefreshProperty,
+                "bordered": systemUsageLegacyBorderedProperty,
+                "actions": systemUsageLegacyActionsProperty,
             ], excludedCommonFields: systemUsageExcludedFields),
             itemVariant("dock", title: "Dock", fields: [
                 "autoResize": boolProperty(defaultValue: true),
@@ -226,6 +230,20 @@ enum MMTMRConfigurationSchema {
         "minimum": .number(1),
         "maximum": .number(30),
         "description": .string("Seconds represented by each new one-pixel graph column."),
+    ])
+
+    private static let systemUsageLegacyBorderedProperty: JSON = .object([
+        "type": .string("boolean"),
+        "deprecated": .bool(true),
+        "description": .string("Legacy compatibility field; ignored by the graph."),
+    ])
+
+    private static let systemUsageLegacyActionsProperty: JSON = .object([
+        "type": .string("array"),
+        "items": reference("#/$defs/action"),
+        "maxItems": .number(0),
+        "deprecated": .bool(true),
+        "description": .string("Legacy empty actions array; ignored by the graph."),
     ])
 
     private static func commonItemProperties(includeActions: Bool) -> [String: JSON] {

@@ -40,8 +40,8 @@ struct ConfigValidator {
     ]
 
     private static let itemExcludedKeys: [String: Set<String>] = [
-        "cpu": ["actions", "width", "image", "bordered", "background", "title"],
-        "memory": ["actions", "width", "image", "bordered", "background", "title"],
+        "cpu": ["width", "image", "background", "title"],
+        "memory": ["width", "image", "background", "title"],
     ]
 
     private static let allItemKeys = itemSpecificKeys.values.reduce(commonItemKeys, { $0.union($1) })
@@ -279,7 +279,11 @@ struct ConfigValidator {
 
             if let actionsValue = item["actions"] {
                 if case let .array(actions) = actionsValue {
-                    if let itemType, Self.nonActionableItemTypes.contains(itemType) {
+                    let isEmptyLegacySystemUsageActions = actions.isEmpty
+                        && itemType.map { ["cpu", "memory"].contains($0) } == true
+                    if let itemType,
+                       Self.nonActionableItemTypes.contains(itemType),
+                       !isEmptyLegacySystemUsageActions {
                         diagnostics.append(error(
                             "config.unsupportedActions",
                             "\(itemPath).actions",

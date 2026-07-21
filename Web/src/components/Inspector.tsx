@@ -950,7 +950,8 @@ export function Inspector({
       { ...FALLBACK_PROPERTIES[key], ...itemSchema?.properties?.[key] },
     ])) as Record<string, JsonSchema>;
   }, [item, itemSchema]);
-  const supportsActions = schema ? itemSchema?.properties?.actions !== undefined : true;
+  const isSystemUsageGraph = item?.type === "cpu" || item?.type === "memory";
+  const supportsActions = !isSystemUsageGraph && (schema ? itemSchema?.properties?.actions !== undefined : true);
   const orderedProperties = useMemo(() => {
     const preferred = [
       "editorName", "title", "notes", "align", "width", "image", "background", "matchAppId",
@@ -964,6 +965,7 @@ export function Inspector({
     return Object.entries(properties)
       .filter(([name]) => {
         if (["actions", "enabled", "bordered"].includes(name)) return false;
+        if (isSystemUsageGraph && ["title", "width", "image", "background"].includes(name)) return false;
         if (item?.type === "group" && name === "items") return false;
         if (["dock", "pinnedDock"].includes(item?.type ?? "") && name === "autoResize") return false;
         if (["dock", "pinnedDock"].includes(item?.type ?? "") && item?.autoResize !== false && name === "width") return false;
@@ -971,7 +973,7 @@ export function Inspector({
         return true;
       })
       .sort(([left], [right]) => (rank.get(left) ?? 1_000) - (rank.get(right) ?? 1_000));
-  }, [item, properties]);
+  }, [isSystemUsageGraph, item, properties]);
 
   return (
     <aside class={`inspector side-panel ${collapsed ? "is-collapsed" : ""}`} aria-label="Inspecteur">
@@ -1017,12 +1019,14 @@ export function Inspector({
                   checked={item.enabled !== false}
                   onChange={(enabled) => onChange({ ...item, enabled })}
                 />
-                <AppleToggle
-                  label="Bordure"
-                  detail="Contour du bouton natif"
-                  checked={item.bordered !== false}
-                  onChange={(bordered) => onChange({ ...item, bordered })}
-                />
+                {!isSystemUsageGraph && (
+                  <AppleToggle
+                    label="Bordure"
+                    detail="Contour du bouton natif"
+                    checked={item.bordered !== false}
+                    onChange={(bordered) => onChange({ ...item, bordered })}
+                  />
+                )}
                 {["dock", "pinnedDock"].includes(item.type) && (
                   <AppleToggle
                     label="Largeur automatique"

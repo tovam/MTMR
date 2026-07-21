@@ -69,8 +69,8 @@ final class ConfigurationCoreTests: XCTestCase {
         {
           "formatVersion": 1,
           "items": [
-            { "id": "processor", "type": "cpu", "refreshInterval": 2 },
-            { "id": "ram", "type": "memory", "refreshInterval": 3 }
+            { "id": "processor", "type": "cpu", "refreshInterval": 2, "bordered": true, "actions": [] },
+            { "id": "ram", "type": "memory", "refreshInterval": 3, "bordered": false, "actions": [] }
           ]
         }
         """#)
@@ -86,7 +86,10 @@ final class ConfigurationCoreTests: XCTestCase {
             { "id": "ram", "type": "memory", "refreshInterval": "often" },
             { "id": "ram-typo", "type": "memory", "interval": 2 },
             { "id": "decorated", "type": "cpu", "width": 40, "title": "CPU" },
-            { "id": "too-fast", "type": "memory", "refreshInterval": 0.5 }
+            { "id": "too-fast", "type": "memory", "refreshInterval": 0.5 },
+            { "id": "non-empty-actions", "type": "cpu", "actions": [
+              { "trigger": "singleTap", "action": "typeText", "text": "x" }
+            ] }
           ]
         }
         """#)
@@ -95,6 +98,7 @@ final class ConfigurationCoreTests: XCTestCase {
         XCTAssertTrue(invalid.diagnostics.contains { $0.code == "config.unknownKey" && $0.path.hasSuffix(".width") })
         XCTAssertTrue(invalid.diagnostics.contains { $0.code == "config.unknownKey" && $0.path.hasSuffix(".title") })
         XCTAssertTrue(invalid.diagnostics.contains { $0.code == "config.range" && $0.path.hasSuffix(".refreshInterval") })
+        XCTAssertTrue(invalid.diagnostics.contains { $0.code == "config.unsupportedActions" && $0.path.hasSuffix(".actions") })
 
         let definitions = try XCTUnwrap(MMTMRConfigurationSchema.document.objectValue?["$defs"]?.objectValue)
         guard case let .array(variants)? = definitions["item"]?.objectValue?["oneOf"] else {
@@ -106,7 +110,12 @@ final class ConfigurationCoreTests: XCTestCase {
             })
             let properties = try XCTUnwrap(variant.objectValue?["properties"]?.objectValue)
             XCTAssertNotNil(properties["refreshInterval"])
-            for forbidden in ["actions", "width", "image", "bordered", "background", "title"] {
+            XCTAssertNotNil(properties["actions"])
+            XCTAssertNotNil(properties["bordered"])
+            XCTAssertNil(properties["actions"]?.objectValue?["default"])
+            XCTAssertNil(properties["bordered"]?.objectValue?["default"])
+            XCTAssertEqual(properties["actions"]?.objectValue?["maxItems"], .number(0))
+            for forbidden in ["width", "image", "background", "title"] {
                 XCTAssertNil(properties[forbidden], "\(type) must remain a bare square graph")
             }
         }
