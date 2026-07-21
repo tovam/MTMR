@@ -186,7 +186,15 @@ describe("modèle de configuration", () => {
       autoResize: true,
       showRunningIndicator: true,
       longPressAction: "quit",
+      spacing: 1,
     });
+  });
+
+  it("crée les jauges CPU et RAM avec les mêmes réglages intelligents", () => {
+    expect(createItem("cpu")).toMatchObject({ type: "cpu", refreshInterval: 2 });
+    expect(createItem("memory")).toMatchObject({ type: "memory", refreshInterval: 2 });
+    expect(createItem("cpu")).not.toHaveProperty("bordered");
+    expect(createItem("memory")).not.toHaveProperty("bordered");
   });
 
   it("n’ajoute editorName que lorsque le schéma du binaire le permet", () => {
@@ -200,13 +208,15 @@ describe("modèle de configuration", () => {
     expect(createItem("staticButton", newSchema)).toMatchObject({ editorName: "Bouton statique" });
   });
 
-  it("déclare les 39 composants avec des libellés français et des icônes distinctes", () => {
+  it("déclare les 40 composants avec des libellés français et des icônes distinctes", () => {
     const entries = schemaItemTypes();
-    expect(entries).toHaveLength(39);
+    expect(entries).toHaveLength(40);
+    expect(entries.find((entry) => entry.type === "cpu")).toMatchObject({ label: "Utilisation CPU", icon: "CPU▥" });
+    expect(entries.find((entry) => entry.type === "memory")).toMatchObject({ label: "Utilisation RAM", icon: "RAM▥" });
     expect(entries.find((entry) => entry.type === "pinnedDock")).toMatchObject({ label: "Dock fixe", icon: "▣" });
     expect(entries.find((entry) => entry.type === "volumeUp")).toMatchObject({ label: "Volume +", icon: "🔊" });
     expect(entries.find((entry) => entry.type === "volumeDown")).toMatchObject({ label: "Volume −", icon: "🔉" });
     expect(entries.every((entry) => entry.icon !== "◇" && entry.description.length > 0 && entry.examples.length > 0)).toBe(true);
-    expect(new Set(entries.map((entry) => entry.icon)).size).toBe(39);
+    expect(new Set(entries.map((entry) => entry.icon)).size).toBe(40);
   });
 });

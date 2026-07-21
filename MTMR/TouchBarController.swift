@@ -29,6 +29,11 @@ struct RuntimeBarGeometry: Sendable {
     let renderedImageChanged: Bool
 }
 
+@MainActor
+protocol RuntimeRenderSignatureProviding: AnyObject {
+    var runtimeRenderSignature: String { get }
+}
+
 extension ItemType {
     var canonicalJSONType: String {
         switch self {
@@ -38,8 +43,9 @@ extension ItemType {
         case .timeButton(formatTemplate: _, timeZone: _, locale: _): return "timeButton"
         case .battery: return "battery"
         case .cpu(refreshInterval: _): return "cpu"
+        case .memory(refreshInterval: _): return "memory"
         case .dock(autoResize: _, filter: _): return "dock"
-        case .pinnedDock(autoResize: _, applications: _, showRunningIndicator: _, longPressAction: _): return "pinnedDock"
+        case .pinnedDock(autoResize: _, applications: _, showRunningIndicator: _, longPressAction: _, spacing: _): return "pinnedDock"
         case .volume: return "volume"
         case .brightness(refreshInterval: _): return "brightness"
         case .weather(interval: _, units: _, api_key: _, icon_type: _): return "weather"
@@ -72,9 +78,11 @@ extension ItemType {
             return "com.tovam.MMTMR.battery."
         case .cpu(refreshInterval: _):
             return "com.tovam.MMTMR.cpu."
+        case .memory(refreshInterval: _):
+            return "com.tovam.MMTMR.memory."
         case .dock(autoResize: _, filter: _):
             return "com.tovam.MMTMR.dock"
-        case .pinnedDock(autoResize: _, applications: _, showRunningIndicator: _, longPressAction: _):
+        case .pinnedDock(autoResize: _, applications: _, showRunningIndicator: _, longPressAction: _, spacing: _):
             return "com.tovam.MMTMR.pinnedDock"
         case .volume:
             return "com.tovam.MMTMR.volume"
@@ -493,6 +501,9 @@ class TouchBarController: NSObject, NSTouchBarDelegate {
         components.append(runtimeRectSignature(view.bounds))
         components.append(view.isHidden ? "hidden" : "shown")
         components.append(runtimeNumberSignature(view.alphaValue))
+        if let provider = view as? RuntimeRenderSignatureProviding {
+            components.append(provider.runtimeRenderSignature)
+        }
 
         if let button = view as? NSButton {
             components.append(button.attributedTitle.string)
@@ -668,7 +679,17 @@ class TouchBarController: NSObject, NSTouchBarDelegate {
         case .battery:
             barItem = BatteryBarItem(identifier: identifier)
         case let .cpu(refreshInterval: refreshInterval):
-            barItem = CPUBarItem(identifier: identifier, refreshInterval: refreshInterval)
+            barItem = SystemUsageBarItem(
+                identifier: identifier,
+                metric: .cpu,
+                refreshInterval: refreshInterval
+            )
+        case let .memory(refreshInterval: refreshInterval):
+            barItem = SystemUsageBarItem(
+                identifier: identifier,
+                metric: .memory,
+                refreshInterval: refreshInterval
+            )
         case let .dock(autoResize: autoResize, filter: regexString):
             if let regexString = regexString {
                 guard let regex = try? NSRegularExpression(pattern: regexString, options: []) else {
@@ -679,13 +700,14 @@ class TouchBarController: NSObject, NSTouchBarDelegate {
             } else {
                 barItem = AppScrubberTouchBarItem(identifier: identifier, autoResize: autoResize)
             }
-        case let .pinnedDock(autoResize, applications, showRunningIndicator, longPressAction):
+        case let .pinnedDock(autoResize, applications, showRunningIndicator, longPressAction, spacing):
             barItem = PinnedAppDockTouchBarItem(
                 identifier: identifier,
                 autoResize: autoResize,
                 applications: applications,
                 showRunningIndicator: showRunningIndicator,
-                longPressAction: longPressAction
+                longPressAction: longPressAction,
+                spacing: spacing
             )
         case .volume:
             if case let .image(source)? = item.additionalParameters[.image] {

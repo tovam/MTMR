@@ -82,6 +82,9 @@ function dropHandler(
 function displayTitle(item: ItemConfig, simulation: SimulationContext): string {
   if (item.type === "timeButton") return simulation.time;
   if (item.type === "battery") return `${simulation.battery}%`;
+  if (item.type === "cpu" || item.type === "memory") {
+    return typeof item.title === "string" ? item.title : "";
+  }
   if (item.type === "inputsource") return "ABC";
   if (item.type === "music") return "♫ Lecture";
   return itemLabel(item);

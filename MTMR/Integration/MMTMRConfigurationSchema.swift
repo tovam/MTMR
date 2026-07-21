@@ -109,7 +109,12 @@ enum MMTMRConfigurationSchema {
                 "locale": stringProperty("Optional locale identifier."),
             ]),
             itemVariant("battery", title: "Battery"),
-            itemVariant("cpu", title: "CPU", fields: ["refreshInterval": numberProperty(defaultValue: 5, minimum: 0.001)]),
+            itemVariant("cpu", title: "CPU usage", fields: [
+                "refreshInterval": systemUsageRefreshProperty,
+            ], excludedCommonFields: systemUsageExcludedFields),
+            itemVariant("memory", title: "Memory usage", fields: [
+                "refreshInterval": systemUsageRefreshProperty,
+            ], excludedCommonFields: systemUsageExcludedFields),
             itemVariant("dock", title: "Dock", fields: [
                 "autoResize": boolProperty(defaultValue: true),
                 "filter": stringProperty("Application bundle-id regular expression."),
@@ -123,6 +128,7 @@ enum MMTMRConfigurationSchema {
                 ]),
                 "showRunningIndicator": boolProperty(defaultValue: true),
                 "longPressAction": enumProperty("none", "quit", defaultValue: "quit"),
+                "spacing": numberProperty(defaultValue: 1, minimum: 0, maximum: 20),
             ], required: ["applications"]),
             itemVariant("volume", title: "Volume"),
             itemVariant("brightness", title: "Brightness", fields: ["refreshInterval": numberProperty(defaultValue: 0.5, minimum: 0.001)]),
@@ -190,9 +196,11 @@ enum MMTMRConfigurationSchema {
         _ type: String,
         title: String,
         fields: [String: JSON] = [:],
-        required: [String] = []
+        required: [String] = [],
+        excludedCommonFields: Set<String> = []
     ) -> JSON {
         var properties = commonItemProperties(includeActions: !nonActionableItemTypes.contains(type))
+        excludedCommonFields.forEach { properties.removeValue(forKey: $0) }
         properties["type"] = .object(["const": .string(type)])
         fields.forEach { properties[$0.key] = $0.value }
         return .object([
@@ -206,7 +214,19 @@ enum MMTMRConfigurationSchema {
         ])
     }
 
-    private static let nonActionableItemTypes: Set<String> = ["dock", "pinnedDock", "volume", "brightness", "group", "swipe", "upnext"]
+    private static let nonActionableItemTypes: Set<String> = ["cpu", "memory", "dock", "pinnedDock", "volume", "brightness", "group", "swipe", "upnext"]
+
+    private static let systemUsageExcludedFields: Set<String> = [
+        "actions", "width", "image", "bordered", "background", "title",
+    ]
+
+    private static let systemUsageRefreshProperty: JSON = .object([
+        "type": .string("number"),
+        "default": .number(2),
+        "minimum": .number(1),
+        "maximum": .number(30),
+        "description": .string("Seconds represented by each new one-pixel graph column."),
+    ])
 
     private static func commonItemProperties(includeActions: Bool) -> [String: JSON] {
         var properties: [String: JSON] = [

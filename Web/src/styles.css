@@ -128,6 +128,13 @@ h3 { margin: 2px 0 0; font-size: 14px; }
 .palette-icon .media-control-icon { width: 30px; height: 22px; }
 .palette-popover-icon .media-control-icon { width: 34px; height: 24px; }
 .media-icon-speaker-body { fill: currentColor; stroke: none; }
+.system-usage-icon { display: block; width: 30px; height: 30px; overflow: hidden; }
+.system-usage-background { fill: #1a1a1a; }
+.system-usage-bar { fill: #b8b8b8; }
+.touch-item[data-kind="cpu"], .touch-item[data-kind="memory"] { width: 30px; min-width: 30px; height: 30px; padding: 0; gap: 0; border-color: transparent; border-radius: 0; background: transparent; }
+.touch-item[data-kind="cpu"]:hover, .touch-item[data-kind="memory"]:hover { background: transparent; border-color: #858c94; }
+.touch-item[data-kind="cpu"].is-selected, .touch-item[data-kind="memory"].is-selected { background: transparent; border-color: var(--blue); }
+.palette-icon .system-usage-icon, .palette-popover-icon .system-usage-icon { width: 30px; height: 30px; }
 .touch-item-image { display: block; width: auto; height: 20px; max-width: 34px; object-fit: contain; }
 .touch-item-complete-render { width: 100%; height: 100%; max-width: none; object-fit: contain; }
 
@@ -240,6 +247,14 @@ h3 { margin: 2px 0 0; font-size: 14px; }
 .pinned-dock-heading > div { min-width: 0; display: flex; flex-direction: column; }
 .pinned-dock-heading strong { font-size: 11px; }
 .pinned-dock-heading small { color: var(--text-faint); font-size: 9px; }
+.pinned-dock-spacing { min-height: 50px; margin-bottom: 9px; padding: 7px 8px; display: flex; align-items: center; justify-content: space-between; gap: 10px; border: 1px solid var(--line-soft); border-radius: 7px; background: var(--field); }
+.pinned-dock-spacing > span { min-width: 0; display: flex; flex-direction: column; }
+.pinned-dock-spacing strong { font-size: 10px; }
+.pinned-dock-spacing small { color: var(--text-faint); font-size: 8px; }
+.pinned-dock-spacing-controls { flex: none; display: flex; align-items: center; gap: 5px; }
+.pinned-dock-spacing-controls input[type="range"] { width: 82px; accent-color: var(--blue); }
+.pinned-dock-spacing-controls input[type="number"] { width: 51px; height: 27px; padding: 0 4px; border: 1px solid #b5bbc0; border-radius: 4px; background: var(--panel); color: var(--text); text-align: right; font: 9px var(--font-mono); }
+.pinned-dock-spacing-controls > span { color: var(--text-faint); font-size: 8px; }
 .pinned-app-picker { padding: 9px; border: 1px solid var(--line-soft); border-radius: 7px; background: var(--field); }
 .pinned-app-picker .property-field { gap: 5px; }
 .pinned-app-select-row { min-width: 0; display: grid; grid-template-columns: 34px minmax(0, 1fr) auto; align-items: center; gap: 6px; margin-top: 7px; }

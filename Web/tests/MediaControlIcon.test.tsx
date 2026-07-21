@@ -1,6 +1,6 @@
 import { render } from "@testing-library/preact";
 import { describe, expect, it } from "vitest";
-import { MediaControlIcon } from "../src/components/MediaControlIcon";
+import { MediaControlIcon, SystemUsageIcon } from "../src/components/MediaControlIcon";
 
 describe("MediaControlIcon", () => {
   it("distingue les deux niveaux de luminosité avec des soleils vectoriels", () => {
@@ -20,5 +20,18 @@ describe("MediaControlIcon", () => {
     const up = render(<MediaControlIcon kind="volumeUp" />).container;
     expect(down.querySelectorAll(".media-icon-speaker > path")).toHaveLength(2);
     expect(up.querySelectorAll(".media-icon-speaker > path")).toHaveLength(4);
+  });
+
+  it("rend le CPU et la RAM comme le même graphique de colonnes d’un pixel", () => {
+    const cpu = render(<SystemUsageIcon kind="cpu" />).container;
+    const memory = render(<SystemUsageIcon kind="memory" />).container;
+    expect(cpu.querySelector("svg")).toHaveAttribute("data-kind", "cpu");
+    expect(memory.querySelector("svg")).toHaveAttribute("data-kind", "memory");
+    expect(cpu.querySelectorAll(".system-usage-bar")).toHaveLength(60);
+    expect(memory.querySelectorAll(".system-usage-bar")).toHaveLength(60);
+    expect(cpu.querySelector("text, circle")).not.toBeInTheDocument();
+    expect(memory.querySelector("text, circle")).not.toBeInTheDocument();
+    expect(cpu.querySelector(".system-usage-bar")).toHaveAttribute("width", "1");
+    expect(memory.querySelector(".system-usage-bar")).toHaveAttribute("width", "1");
   });
 });

@@ -70,6 +70,7 @@ const ACTION_PROPERTY_LABELS: Record<string, string> = {
   timeZone: "Fuseau horaire",
   locale: "Locale",
   autoResize: "Largeur automatique",
+  spacing: "Marge entre les icônes",
   filter: "Filtre d’applications",
   units: "Unités",
   api_key: "Clé API",
@@ -628,6 +629,9 @@ function PinnedDockEditor({ item, onChange }: { item: ItemConfig; onChange(item:
   const [draggedIndex, setDraggedIndex] = useState<number>();
   const [dropIndex, setDropIndex] = useState<number>();
   const configured = Array.isArray(item.applications) ? item.applications : [];
+  const spacing = typeof item.spacing === "number" && Number.isFinite(item.spacing)
+    ? Math.max(0, Math.min(20, item.spacing))
+    : 1;
   const catalogByIdentifier = useMemo(
     () => new Map(catalog.map((application) => [application.bundleIdentifier, application])),
     [catalog],
@@ -669,6 +673,10 @@ function PinnedDockEditor({ item, onChange }: { item: ItemConfig; onChange(item:
   const replaceApplications = (applications: PinnedApplicationConfig[]) => {
     onChange({ ...item, applications });
   };
+  const replaceSpacing = (value: number) => {
+    if (!Number.isFinite(value)) return;
+    onChange({ ...item, spacing: Math.max(0, Math.min(20, value)) });
+  };
   const addIdentifier = (bundleIdentifier: string) => {
     const trimmed = bundleIdentifier.trim();
     if (!trimmed || configuredIdentifiers.has(trimmed)) return;
@@ -705,6 +713,34 @@ function PinnedDockEditor({ item, onChange }: { item: ItemConfig; onChange(item:
         </div>
         <span class="count-pill">{configured.length}</span>
       </div>
+
+      <label class="pinned-dock-spacing">
+        <span>
+          <strong>Marge entre les icônes</strong>
+          <small>Espacement horizontal inclus dans la largeur automatique</small>
+        </span>
+        <div class="pinned-dock-spacing-controls">
+          <input
+            type="range"
+            min="0"
+            max="20"
+            step="0.5"
+            value={spacing}
+            aria-label="Marge entre les icônes"
+            onInput={(event) => replaceSpacing(event.currentTarget.valueAsNumber)}
+          />
+          <input
+            type="number"
+            min="0"
+            max="20"
+            step="0.5"
+            value={spacing}
+            aria-label="Marge entre les icônes en points"
+            onInput={(event) => replaceSpacing(event.currentTarget.valueAsNumber)}
+          />
+          <span>pt</span>
+        </div>
+      </label>
 
       <div class="pinned-app-picker">
         <label class="property-field">
@@ -931,7 +967,7 @@ export function Inspector({
         if (item?.type === "group" && name === "items") return false;
         if (["dock", "pinnedDock"].includes(item?.type ?? "") && name === "autoResize") return false;
         if (["dock", "pinnedDock"].includes(item?.type ?? "") && item?.autoResize !== false && name === "width") return false;
-        if (item?.type === "pinnedDock" && ["applications", "showRunningIndicator", "longPressAction"].includes(name)) return false;
+        if (item?.type === "pinnedDock" && ["applications", "showRunningIndicator", "longPressAction", "spacing"].includes(name)) return false;
         return true;
       })
       .sort(([left], [right]) => (rank.get(left) ?? 1_000) - (rank.get(right) ?? 1_000));

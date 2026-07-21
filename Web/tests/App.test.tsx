@@ -182,6 +182,7 @@ describe("éditeur MMTMR", () => {
         autoResize: true,
         showRunningIndicator: true,
         longPressAction: "quit",
+        spacing: 1,
         applications: [{ bundleIdentifier: "com.apple.Terminal" }],
       }],
     };
@@ -198,6 +199,7 @@ describe("éditeur MMTMR", () => {
         applications: { type: "array", default: [] },
         showRunningIndicator: { type: "boolean", default: true },
         longPressAction: { type: "string", enum: ["none", "quit"], default: "quit" },
+        spacing: { type: "number", default: 1, minimum: 0, maximum: 20 },
       },
       required: ["id", "type", "applications"],
     };
@@ -250,6 +252,10 @@ describe("éditeur MMTMR", () => {
     await user.click(await screen.findByRole("button", { name: "Dock fixe" }));
     expect(await screen.findByText("Terminal")).toBeInTheDocument();
     expect(screen.getByText("ouverte")).toBeInTheDocument();
+    const spacingInput = screen.getByRole("spinbutton", { name: "Marge entre les icônes en points" });
+    expect(spacingInput).toHaveValue(1);
+    fireEvent.input(spacingInput, { target: { value: "4.5" } });
+    expect(spacingInput).toHaveValue(4.5);
     await user.type(screen.getByPlaceholderText("Nom, identifiant ou dossier…"), "fire");
     expect(screen.getByRole("option", { name: "Firefox — fermée" })).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Ajouter l’application sélectionnée" }));
@@ -262,6 +268,7 @@ describe("éditeur MMTMR", () => {
       expect(put).toBeDefined();
       const body = JSON.parse(String(put?.[1]?.body));
       const saved = JSON.parse(body.source);
+      expect(saved.items[0].spacing).toBe(4.5);
       expect(saved.items[0].applications.map((application: { bundleIdentifier: string }) => application.bundleIdentifier))
         .toEqual(["org.mozilla.firefox", "com.apple.Terminal"]);
     }, { timeout: 2_500 });

@@ -24,7 +24,8 @@ export const FALLBACK_ITEM_TYPES: readonly PaletteItemPresentation[] = [
   { type: "shellScriptTitledButton", label: "Titre Shell", icon: ">_", description: "Calcule périodiquement le titre avec un script shell. Pratique pour une information locale courte.", examples: ["Branche Git", "Statut service"] },
   { type: "timeButton", label: "Heure", icon: "◷", description: "Affiche l’heure selon un format, un fuseau et une locale. L’aperçu direct reprend la valeur fournie par MMTMR.", examples: ["14:32", "sam. 18", "UTC"] },
   { type: "battery", label: "Batterie", icon: "▰", description: "Affiche le niveau et l’état de la batterie du Mac. La valeur réelle arrive par le mode Direct.", examples: ["82 %", "En charge"] },
-  { type: "cpu", label: "Processeur", icon: "%", description: "Affiche l’utilisation du processeur avec un rafraîchissement réglable. Convient à une surveillance rapide.", examples: ["CPU 18 %", "CPU 73 %"] },
+  { type: "cpu", label: "Utilisation CPU", icon: "CPU▥", description: "Mini-historique carré du processeur : chaque colonne d’un pixel représente une mesure et le graphique avance vers la gauche.", examples: ["Historique CPU", "1 colonne / mesure"] },
+  { type: "memory", label: "Utilisation RAM", icon: "RAM▥", description: "Le même mini-historique pour la mémoire occupée, sans texte ni décoration. Le cache récupérable est considéré disponible.", examples: ["Historique RAM", "1 colonne / mesure"] },
   { type: "dock", label: "Applications", icon: "▦", description: "Présente les applications actives sous forme de Dock tactile. Les icônes exactes nécessitent le rendu Direct de MMTMR.", examples: ["Finder", "Safari", "Terminal"] },
   { type: "pinnedDock", label: "Dock fixe", icon: "▣", description: "Affiche exactement les applications choisies, dans un ordre fixe, qu’elles soient ouvertes ou fermées. Un toucher active ou lance l’application.", examples: ["Finder + Firefox", "Terminal + Notes", "Apps de travail"] },
   { type: "volume", label: "Volume", icon: "◖", description: "Ajoute le contrôle interactif du volume système. Ce composant gère lui-même ses gestes.", examples: ["Curseur audio", "Muet"] },
@@ -205,6 +206,11 @@ export function createItem(type: string, schema?: JsonSchema): ItemConfig {
     if (item.autoResize === undefined) item.autoResize = true;
     if (item.showRunningIndicator === undefined) item.showRunningIndicator = true;
     if (item.longPressAction === undefined) item.longPressAction = "quit";
+    if (item.spacing === undefined) item.spacing = 1;
+  }
+  if (type === "cpu" || type === "memory") {
+    if (item.refreshInterval === undefined) item.refreshInterval = 2;
+    delete item.bordered;
   }
   if (item.editorName === undefined && typeSchema?.properties?.editorName !== undefined) {
     item.editorName = FALLBACK_ITEM_TYPES.find((entry) => entry.type === type)?.label ?? type;

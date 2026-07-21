@@ -1,82 +1,239 @@
 //
 //  CPUBarItem.swift
-//  MTMR
+//  MMTMR
 //
-//  Created by bobrosoft on 17/08/2021.
-//  Copyright © 2018 Anton Palgunov. All rights reserved.
+//  Pixel-history graphs for CPU and memory usage.
 //
 
+import AppKit
 import Foundation
 
-class CPUBarItem: CustomButtonTouchBarItem {
-    private let refreshInterval: TimeInterval
-    private var refreshQueue: DispatchQueue? = DispatchQueue(label: "mtmr.cpu")
-    private let defaultSingleTapScript: NSAppleScript! = "activate application \"Activity Monitor\"\rtell application \"System Events\"\r\ttell process \"Activity Monitor\"\r\t\ttell radio button \"CPU\" of radio group 1 of group 2 of toolbar 1 of window 1 to perform action \"AXPress\"\r\tend tell\rend tell".appleScript
+enum SystemUsageMetric: Sendable {
+    case cpu
+    case memory
 
-    init(identifier: NSTouchBarItem.Identifier, refreshInterval: TimeInterval) {
-        self.refreshInterval = refreshInterval
-        super.init(identifier: identifier, title: "⏳")
-                
-        // Set default image
-        if self.image == nil {
-            self.image = #imageLiteral(resourceName: "cpu").resize(maxSize: NSSize(width: 24, height: 24));
+    var accessibilityLabel: String {
+        switch self {
+        case .cpu: return "Historique d’utilisation du processeur"
+        case .memory: return "Historique d’utilisation de la mémoire"
         }
-        
-        // Set default action
-        if actions.filter({ $0.trigger == .singleTap }).isEmpty {
-            actions.append(ItemAction(
-                trigger: .singleTap,
-                defaultTapAction
-            ))
+    }
+}
+
+private struct SystemUsageSampler {
+    let metric: SystemUsageMetric
+    private var previousCPULoad: host_cpu_load_info_data_t?
+
+    init(metric: SystemUsageMetric) {
+        self.metric = metric
+        self.previousCPULoad = nil
+    }
+
+    mutating func sample() -> Double? {
+        switch metric {
+        case .cpu:
+            return sampleCPU()
+        case .memory:
+            return sampleMemory()
         }
-        
-        refreshAndSchedule()
+    }
+
+    private mutating func sampleCPU() -> Double? {
+        var load = host_cpu_load_info()
+        var count = mach_msg_type_number_t(
+            MemoryLayout<host_cpu_load_info_data_t>.size / MemoryLayout<integer_t>.size
+        )
+        let result = withUnsafeMutablePointer(to: &load) {
+            $0.withMemoryRebound(to: integer_t.self, capacity: Int(count)) {
+                host_statistics(mach_host_self(), HOST_CPU_LOAD_INFO, $0, &count)
+            }
+        }
+        guard result == KERN_SUCCESS else { return nil }
+        guard let previous = previousCPULoad else {
+            previousCPULoad = load
+            return nil
+        }
+        previousCPULoad = load
+
+        let user = Double(load.cpu_ticks.0 &- previous.cpu_ticks.0)
+        let system = Double(load.cpu_ticks.1 &- previous.cpu_ticks.1)
+        let idle = Double(load.cpu_ticks.2 &- previous.cpu_ticks.2)
+        let nice = Double(load.cpu_ticks.3 &- previous.cpu_ticks.3)
+        let total = user + system + idle + nice
+        guard total > 0 else { return nil }
+        return min(1, max(0, (user + system + nice) / total))
+    }
+
+    private func sampleMemory() -> Double? {
+        var statistics = vm_statistics64()
+        var count = mach_msg_type_number_t(
+            MemoryLayout<vm_statistics64_data_t>.size / MemoryLayout<integer_t>.size
+        )
+        let result = withUnsafeMutablePointer(to: &statistics) {
+            $0.withMemoryRebound(to: integer_t.self, capacity: Int(count)) {
+                host_statistics64(mach_host_self(), HOST_VM_INFO64, $0, &count)
+            }
+        }
+        guard result == KERN_SUCCESS else { return nil }
+
+        var pageSize: vm_size_t = 0
+        guard host_page_size(mach_host_self(), &pageSize) == KERN_SUCCESS, pageSize > 0 else {
+            return nil
+        }
+        let totalPages = ProcessInfo.processInfo.physicalMemory / UInt64(pageSize)
+        guard totalPages > 0 else { return nil }
+
+        let reclaimablePages = UInt64(statistics.free_count)
+            + UInt64(statistics.inactive_count)
+            + UInt64(statistics.speculative_count)
+        let availablePages = min(totalPages, reclaimablePages)
+        return Double(totalPages - availablePages) / Double(totalPages)
+    }
+}
+
+@MainActor
+private final class SystemUsageGraphView: NSView, RuntimeRenderSignatureProviding {
+    static let size = NSSize(width: 30, height: 30)
+
+    private var samples: [CGFloat] = []
+    private var revision: UInt64 = 0
+
+    init() {
+        super.init(frame: NSRect(origin: .zero, size: Self.size))
     }
 
     required init?(coder _: NSCoder) {
         fatalError("init(coder:) has not been implemented")
     }
-    
-    func refreshAndSchedule() {
-        DispatchQueue.main.async {
-            // Get CPU load
-            let usage = 100 - CPU.systemUsage().idle
-            guard usage.isFinite else {
-                return
-            }
-            
-            // Choose color based on CPU load
-            var color: NSColor? = nil
-            var bgColor: NSColor? = nil
-            if usage > 70 {
-                color = .black
-                bgColor = .yellow
-            } else if usage > 30 {
-                color = .yellow
-            }
-            
-            // Update layout
-            let attrTitle = NSMutableAttributedString.init(attributedString: String(format: "%.1f%%", usage).defaultTouchbarAttributedString)
-            if let color = color {
-                attrTitle.addAttributes([.foregroundColor: color], range: NSRange(location: 0, length: attrTitle.length))
-            }
-            self.attributedTitle = attrTitle
-            self.backgroundColor = bgColor
+
+    override var intrinsicContentSize: NSSize { Self.size }
+    override var isOpaque: Bool { true }
+    var runtimeRenderSignature: String { String(revision) }
+
+    func append(_ usage: Double) {
+        samples.append(CGFloat(min(1, max(0, usage))))
+        revision &+= 1
+        if samples.count > 512 {
+            samples.removeFirst(samples.count - 512)
         }
-        
-        refreshQueue?.asyncAfter(deadline: .now() + refreshInterval) { [weak self] in
-            self?.refreshAndSchedule()
+        needsDisplay = true
+    }
+
+    override func draw(_ dirtyRect: NSRect) {
+        super.draw(dirtyRect)
+        guard let context = NSGraphicsContext.current else { return }
+
+        context.saveGraphicsState()
+        defer { context.restoreGraphicsState() }
+        context.shouldAntialias = false
+
+        NSColor(calibratedWhite: 0.10, alpha: 1).setFill()
+        bounds.fill()
+
+        let scale = max(1, window?.backingScaleFactor ?? NSScreen.main?.backingScaleFactor ?? 2)
+        let pixel = 1 / scale
+        let capacity = max(1, Int((bounds.width * scale).rounded(.down)))
+        let visibleSamples = samples.suffix(capacity)
+        let startingX = bounds.maxX - CGFloat(visibleSamples.count) * pixel
+
+        NSColor(calibratedWhite: 0.72, alpha: 1).setFill()
+        for (index, sample) in visibleSamples.enumerated() {
+            let height = (sample * bounds.height * scale).rounded(.down) / scale
+            guard height > 0 else { continue }
+            NSRect(
+                x: startingX + CGFloat(index) * pixel,
+                y: bounds.minY,
+                width: pixel,
+                height: min(bounds.height, height)
+            ).fill()
+        }
+    }
+}
+
+/// A fixed-size graph. Every successful sample appends one physical-pixel
+/// column at the right edge; older columns move left and eventually disappear.
+@MainActor
+final class SystemUsageBarItem: NSCustomTouchBarItem {
+    @MainActor
+    private final class TimerTarget: NSObject {
+        weak var owner: SystemUsageBarItem?
+
+        init(owner: SystemUsageBarItem) {
+            self.owner = owner
+        }
+
+        @objc func fire() {
+            owner?.sampleTimerFired()
         }
     }
 
-    func defaultTapAction() {
-        refreshQueue?.async { [weak self] in
-            self?.defaultSingleTapScript.executeAndReturnError(nil)
-        }
+    private let metric: SystemUsageMetric
+    private let refreshInterval: TimeInterval
+    private let graphView = SystemUsageGraphView()
+    private var sampler: SystemUsageSampler
+    private var timer: Timer?
+    private var timerTarget: TimerTarget?
+
+    init(
+        identifier: NSTouchBarItem.Identifier,
+        metric: SystemUsageMetric,
+        refreshInterval: TimeInterval
+    ) {
+        self.metric = metric
+        self.refreshInterval = min(30, max(1, refreshInterval.isFinite ? refreshInterval : 2))
+        self.sampler = SystemUsageSampler(metric: metric)
+        super.init(identifier: identifier)
+
+        timerTarget = TimerTarget(owner: self)
+        view = graphView
+        updateAccessibility(usage: nil)
+        sampleAndSchedule()
     }
-    
+
+    required init?(coder _: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    private func sampleTimerFired() {
+        sampleAndSchedule()
+    }
+
+    private func sampleAndSchedule() {
+        timer?.invalidate()
+        timer = nil
+
+        guard let usage = sampler.sample(), usage.isFinite else {
+            // CPU usage is a delta, so obtain its second counter snapshot fast.
+            schedule(after: metric == .cpu ? 0.35 : refreshInterval)
+            return
+        }
+
+        graphView.append(usage)
+        updateAccessibility(usage: usage)
+        schedule(after: refreshInterval)
+    }
+
+    private func schedule(after interval: TimeInterval) {
+        guard let timerTarget else { return }
+        let timer = Timer(
+            timeInterval: interval,
+            target: timerTarget,
+            selector: #selector(TimerTarget.fire),
+            userInfo: nil,
+            repeats: false
+        )
+        self.timer = timer
+        RunLoop.main.add(timer, forMode: .common)
+    }
+
+    private func updateAccessibility(usage: Double?) {
+        graphView.setAccessibilityLabel(metric.accessibilityLabel)
+        graphView.setAccessibilityValue(
+            usage.map { "\(Int(($0 * 100).rounded())) %" } ?? "Mesure en cours"
+        )
+    }
+
     isolated deinit {
-        refreshQueue?.suspend()
-        refreshQueue = nil
+        timer?.invalidate()
     }
 }

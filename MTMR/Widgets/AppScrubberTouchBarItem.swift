@@ -205,6 +205,7 @@ class PinnedAppDockTouchBarItem: NSCustomTouchBarItem {
     private let definitions: [PinnedApplicationDefinition]
     private let showRunningIndicator: Bool
     private let longPressAction: PinnedDockLongPressAction
+    private let spacing: CGFloat
     private var widthConstraint: NSLayoutConstraint?
     private var items: [DockBarItem] = []
 
@@ -213,12 +214,14 @@ class PinnedAppDockTouchBarItem: NSCustomTouchBarItem {
         autoResize: Bool,
         applications: [PinnedApplicationDefinition],
         showRunningIndicator: Bool,
-        longPressAction: PinnedDockLongPressAction
+        longPressAction: PinnedDockLongPressAction,
+        spacing: Double
     ) {
         self.autoResize = autoResize
         definitions = applications
         self.showRunningIndicator = showRunningIndicator
         self.longPressAction = longPressAction
+        self.spacing = CGFloat(min(20, max(0, spacing)))
         super.init(identifier: identifier)
         view = scrollView
 
@@ -262,7 +265,7 @@ class PinnedAppDockTouchBarItem: NSCustomTouchBarItem {
     private func reloadItems() {
         items = definitions.map(createAppButton)
         let stackView = NSStackView(views: items.map(\.view))
-        stackView.spacing = 1
+        stackView.spacing = spacing
         stackView.orientation = .horizontal
         let visibleOrigin = scrollView.documentVisibleRect.origin
         scrollView.documentView = stackView

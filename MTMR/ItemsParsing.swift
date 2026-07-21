@@ -303,12 +303,14 @@ enum ItemType: Decodable {
     case timeButton(formatTemplate: String, timeZone: String?, locale: String?)
     case battery
     case cpu(refreshInterval: Double)
+    case memory(refreshInterval: Double)
     case dock(autoResize: Bool, filter: String?)
     case pinnedDock(
         autoResize: Bool,
         applications: [PinnedApplicationDefinition],
         showRunningIndicator: Bool,
-        longPressAction: PinnedDockLongPressAction
+        longPressAction: PinnedDockLongPressAction,
+        spacing: Double
     )
     case volume
     case brightness(refreshInterval: Double)
@@ -353,6 +355,7 @@ enum ItemType: Decodable {
         case applications
         case showRunningIndicator
         case longPressAction
+        case spacing
         case disableMarquee
         case alternativeImages
         case sourceApple
@@ -370,6 +373,7 @@ enum ItemType: Decodable {
         case timeButton
         case battery
         case cpu
+        case memory
         case dock
         case pinnedDock
         case volume
@@ -418,8 +422,12 @@ enum ItemType: Decodable {
             self = .battery
             
         case .cpu:
-            let refreshInterval = try container.decodeIfPresent(Double.self, forKey: .refreshInterval) ?? 5.0
+            let refreshInterval = try container.decodeIfPresent(Double.self, forKey: .refreshInterval) ?? 2.0
             self = .cpu(refreshInterval: refreshInterval)
+
+        case .memory:
+            let refreshInterval = try container.decodeIfPresent(Double.self, forKey: .refreshInterval) ?? 2.0
+            self = .memory(refreshInterval: refreshInterval)
 
         case .dock:
             // A Dock without an explicit width should hug its application icons.
@@ -438,11 +446,13 @@ enum ItemType: Decodable {
             let applications = try container.decode([PinnedApplicationDefinition].self, forKey: .applications)
             let showRunningIndicator = try container.decodeIfPresent(Bool.self, forKey: .showRunningIndicator) ?? true
             let longPressAction = try container.decodeIfPresent(PinnedDockLongPressAction.self, forKey: .longPressAction) ?? .quit
+            let spacing = try container.decodeIfPresent(Double.self, forKey: .spacing) ?? 1
             self = .pinnedDock(
                 autoResize: autoResize,
                 applications: applications,
                 showRunningIndicator: showRunningIndicator,
-                longPressAction: longPressAction
+                longPressAction: longPressAction,
+                spacing: spacing
             )
 
         case .volume:

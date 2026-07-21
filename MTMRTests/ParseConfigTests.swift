@@ -116,26 +116,60 @@ class ParseConfig: XCTestCase {
         XCTAssertEqual(automaticValues, [true, false, true, false])
     }
 
-    func testPinnedDockKeepsExplicitApplicationOrderAndDefaults() throws {
+    func testCPUAndMemoryUsageShareTheSameRefreshDefaults() throws {
         let fixture = #"""
-            [{
-              "type": "pinnedDock",
-              "applications": [
-                {"bundleIdentifier":"org.mozilla.firefox"},
-                {"bundleIdentifier":"com.apple.Terminal","label":"Terminal","path":"/Applications/Terminal.app"}
-              ]
-            }]
+            [
+              { "type": "cpu" },
+              { "type": "memory" },
+              { "type": "memory", "refreshInterval": 7.5 }
+            ]
         """#.data(using: .utf8)!
 
-        let item = try XCTUnwrap(JSONDecoder().decode([BarItemDefinition].self, from: fixture).first)
-        guard case let .pinnedDock(autoResize, applications, showRunningIndicator, longPressAction) = item.type else {
+        let items = try JSONDecoder().decode([BarItemDefinition].self, from: fixture)
+        guard case let .cpu(cpuInterval) = items[0].type else {
+            return XCTFail("Expected the CPU usage component")
+        }
+        guard case let .memory(defaultMemoryInterval) = items[1].type else {
+            return XCTFail("Expected the memory usage component")
+        }
+        guard case let .memory(customMemoryInterval) = items[2].type else {
+            return XCTFail("Expected the configurable memory usage component")
+        }
+
+        XCTAssertEqual(cpuInterval, 2)
+        XCTAssertEqual(defaultMemoryInterval, 2)
+        XCTAssertEqual(customMemoryInterval, 7.5)
+    }
+
+    func testPinnedDockKeepsExplicitApplicationOrderAndDefaults() throws {
+        let fixture = #"""
+            [
+              {
+                "type": "pinnedDock",
+                "applications": [
+                  {"bundleIdentifier":"org.mozilla.firefox"},
+                  {"bundleIdentifier":"com.apple.Terminal","label":"Terminal","path":"/Applications/Terminal.app"}
+                ]
+              },
+              {"type":"pinnedDock","applications":[],"spacing":6.5}
+            ]
+        """#.data(using: .utf8)!
+
+        let decoded = try JSONDecoder().decode([BarItemDefinition].self, from: fixture)
+        let item = try XCTUnwrap(decoded.first)
+        guard case let .pinnedDock(autoResize, applications, showRunningIndicator, longPressAction, spacing) = item.type else {
             return XCTFail("Expected a pinnedDock runtime item")
         }
         XCTAssertTrue(autoResize)
         XCTAssertTrue(showRunningIndicator)
         XCTAssertEqual(longPressAction, .quit)
+        XCTAssertEqual(spacing, 1)
         XCTAssertEqual(applications.map(\.bundleIdentifier), ["org.mozilla.firefox", "com.apple.Terminal"])
         XCTAssertEqual(applications.last?.label, "Terminal")
+        guard case let .pinnedDock(_, _, _, _, customSpacing) = decoded[1].type else {
+            return XCTFail("Expected the custom-spacing pinnedDock runtime item")
+        }
+        XCTAssertEqual(customSpacing, 6.5)
     }
 
     func testExtendedWidthForPredefinedItem() {

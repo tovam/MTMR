@@ -3,7 +3,7 @@ import Foundation
 struct ConfigValidator {
     static let supportedItemTypes: Set<String> = [
         "staticButton", "appleScriptTitledButton", "shellScriptTitledButton", "timeButton",
-        "battery", "cpu", "dock", "pinnedDock", "volume", "brightness", "weather", "yandexWeather",
+        "battery", "cpu", "memory", "dock", "pinnedDock", "volume", "brightness", "weather", "yandexWeather",
         "currency", "inputsource", "music", "group", "nightShift", "dnd", "pomodoro",
         "network", "darkMode", "swipe", "upnext", "escape", "delete", "brightnessUp",
         "brightnessDown", "illuminationUp", "illuminationDown", "volumeDown", "volumeUp",
@@ -24,8 +24,9 @@ struct ConfigValidator {
         "shellScriptTitledButton": ["source", "refreshInterval"],
         "timeButton": ["formatTemplate", "timeZone", "locale"],
         "cpu": ["refreshInterval"],
+        "memory": ["refreshInterval"],
         "dock": ["autoResize", "filter"],
-        "pinnedDock": ["autoResize", "applications", "showRunningIndicator", "longPressAction"],
+        "pinnedDock": ["autoResize", "applications", "showRunningIndicator", "longPressAction", "spacing"],
         "brightness": ["refreshInterval"],
         "weather": ["refreshInterval", "units", "api_key", "icon_type"],
         "yandexWeather": ["refreshInterval"],
@@ -38,15 +39,20 @@ struct ConfigValidator {
         "upnext": ["from", "to", "maxToShow", "autoResize", "refreshInterval"],
     ]
 
+    private static let itemExcludedKeys: [String: Set<String>] = [
+        "cpu": ["actions", "width", "image", "bordered", "background", "title"],
+        "memory": ["actions", "width", "image", "bordered", "background", "title"],
+    ]
+
     private static let allItemKeys = itemSpecificKeys.values.reduce(commonItemKeys, { $0.union($1) })
-    private static let nonActionableItemTypes: Set<String> = ["dock", "pinnedDock", "volume", "brightness", "group", "swipe", "upnext"]
+    private static let nonActionableItemTypes: Set<String> = ["cpu", "memory", "dock", "pinnedDock", "volume", "brightness", "group", "swipe", "upnext"]
 
     private static let stringItemKeys: Set<String> = [
         "notes", "editorName", "background", "title", "matchAppId", "timeZone", "units", "api_key",
         "icon_type", "formatTemplate", "locale", "filter", "direction", "longPressAction"
     ]
     private static let numberItemKeys: Set<String> = [
-        "width", "refreshInterval", "workTime", "restTime", "minOffset", "maxToShow", "fingers"
+        "width", "refreshInterval", "workTime", "restTime", "minOffset", "maxToShow", "fingers", "spacing"
     ]
     private static let boolItemKeys: Set<String> = [
         "enabled", "bordered", "full", "flip", "autoResize", "disableMarquee", "showRunningIndicator"
@@ -123,7 +129,9 @@ struct ConfigValidator {
 
             let allowedItemKeys: Set<String>
             if let itemType, Self.supportedItemTypes.contains(itemType) {
-                allowedItemKeys = Self.commonItemKeys.union(Self.itemSpecificKeys[itemType] ?? [])
+                allowedItemKeys = Self.commonItemKeys
+                    .union(Self.itemSpecificKeys[itemType] ?? [])
+                    .subtracting(Self.itemExcludedKeys[itemType] ?? [])
             } else {
                 allowedItemKeys = Self.allItemKeys
             }
@@ -148,8 +156,27 @@ struct ConfigValidator {
             if let width = item["width"]?.numberValue, width < 0 {
                 diagnostics.append(error("config.range", "\(itemPath).width", "width must be zero or greater."))
             }
+            if itemType == "pinnedDock",
+               let spacing = item["spacing"]?.numberValue,
+               spacing < 0 || spacing > 20 {
+                diagnostics.append(error(
+                    "config.range",
+                    "\(itemPath).spacing",
+                    "pinnedDock spacing must be from 0 through 20 points."
+                ))
+            }
             if let interval = item["refreshInterval"]?.numberValue, interval < 0.001 {
                 diagnostics.append(error("config.range", "\(itemPath).refreshInterval", "refreshInterval must be at least 0.001 seconds."))
+            }
+            if let itemType,
+               ["cpu", "memory"].contains(itemType),
+               let interval = item["refreshInterval"]?.numberValue,
+               interval < 1 || interval > 30 {
+                diagnostics.append(error(
+                    "config.range",
+                    "\(itemPath).refreshInterval",
+                    "\(itemType) refreshInterval must be from 1 through 30 seconds."
+                ))
             }
             for key in ["workTime", "restTime"] {
                 if let value = item[key]?.numberValue, value < 0.001 {

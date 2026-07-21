@@ -466,7 +466,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     message: "The shell title source must be readable text."
                 ))
             }
-        case let .pinnedDock(_, applications, _, _):
+        case let .pinnedDock(_, applications, _, _, _):
             for (index, application) in applications.enumerated() {
                 let pathExists = application.path.map {
                     FileManager.default.fileExists(atPath: $0)

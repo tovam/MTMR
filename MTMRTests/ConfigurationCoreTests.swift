@@ -64,6 +64,54 @@ final class ConfigurationCoreTests: XCTestCase {
         XCTAssertTrue(result.diagnostics.contains(where: { $0.code == "config.unknownItemType" }))
     }
 
+    func testCPUAndMemoryUsageAreStrictValidatedRuntimeTypes() throws {
+        let result = codec.decode(#"""
+        {
+          "formatVersion": 1,
+          "items": [
+            { "id": "processor", "type": "cpu", "refreshInterval": 2 },
+            { "id": "ram", "type": "memory", "refreshInterval": 3 }
+          ]
+        }
+        """#)
+
+        XCTAssertTrue(result.isValid, "\(result.diagnostics)")
+        let runtimeItems = try XCTUnwrap(result.document).runtimeItems()
+        XCTAssertEqual(runtimeItems.map(\.kind), ["cpu", "memory"])
+
+        let invalid = codec.decode(#"""
+        {
+          "formatVersion": 1,
+          "items": [
+            { "id": "ram", "type": "memory", "refreshInterval": "often" },
+            { "id": "ram-typo", "type": "memory", "interval": 2 },
+            { "id": "decorated", "type": "cpu", "width": 40, "title": "CPU" },
+            { "id": "too-fast", "type": "memory", "refreshInterval": 0.5 }
+          ]
+        }
+        """#)
+        XCTAssertTrue(invalid.diagnostics.contains { $0.code == "config.type" && $0.path.hasSuffix(".refreshInterval") })
+        XCTAssertTrue(invalid.diagnostics.contains { $0.code == "config.unknownKey" && $0.path.hasSuffix(".interval") })
+        XCTAssertTrue(invalid.diagnostics.contains { $0.code == "config.unknownKey" && $0.path.hasSuffix(".width") })
+        XCTAssertTrue(invalid.diagnostics.contains { $0.code == "config.unknownKey" && $0.path.hasSuffix(".title") })
+        XCTAssertTrue(invalid.diagnostics.contains { $0.code == "config.range" && $0.path.hasSuffix(".refreshInterval") })
+
+        let definitions = try XCTUnwrap(MMTMRConfigurationSchema.document.objectValue?["$defs"]?.objectValue)
+        guard case let .array(variants)? = definitions["item"]?.objectValue?["oneOf"] else {
+            return XCTFail("The item schema must expose oneOf variants.")
+        }
+        for type in ["cpu", "memory"] {
+            let variant = try XCTUnwrap(variants.first {
+                $0.objectValue?["properties"]?.objectValue?["type"]?.objectValue?["const"] == .string(type)
+            })
+            let properties = try XCTUnwrap(variant.objectValue?["properties"]?.objectValue)
+            XCTAssertNotNil(properties["refreshInterval"])
+            for forbidden in ["actions", "width", "image", "bordered", "background", "title"] {
+                XCTAssertNil(properties[forbidden], "\(type) must remain a bare square graph")
+            }
+        }
+    }
+
     func testPinnedDockValidationAndRelativeFallbackPath() throws {
         let duplicate = codec.decode(#"""
         {
@@ -75,7 +123,8 @@ final class ConfigurationCoreTests: XCTestCase {
               {"bundleIdentifier":"com.apple.Terminal"},
               {"bundleIdentifier":"com.apple.Terminal","unknown":true}
             ],
-            "longPressAction": "explode"
+            "longPressAction": "explode",
+            "spacing": 21
           }]
         }
         """#)
@@ -83,6 +132,7 @@ final class ConfigurationCoreTests: XCTestCase {
         XCTAssertTrue(duplicate.diagnostics.contains { $0.code == "config.duplicateApplication" })
         XCTAssertTrue(duplicate.diagnostics.contains { $0.code == "config.unknownKey" && $0.path.hasSuffix(".unknown") })
         XCTAssertTrue(duplicate.diagnostics.contains { $0.code == "config.enum" && $0.path.hasSuffix(".longPressAction") })
+        XCTAssertTrue(duplicate.diagnostics.contains { $0.code == "config.range" && $0.path.hasSuffix(".spacing") })
 
         let valid = codec.decode(#"""
         {
@@ -90,7 +140,8 @@ final class ConfigurationCoreTests: XCTestCase {
           "items": [{
             "id": "fixed-apps",
             "type": "pinnedDock",
-            "applications": [{"bundleIdentifier":"com.example.App","path":"Apps/Example.app"}]
+            "applications": [{"bundleIdentifier":"com.example.App","path":"Apps/Example.app"}],
+            "spacing": 6.5
           }]
         }
         """#)
@@ -101,6 +152,7 @@ final class ConfigurationCoreTests: XCTestCase {
         let runtimeJSON = try JSONDecoder().decode(JSONValue.self, from: runtime.data)
         let application = try XCTUnwrap(runtimeJSON.objectValue?["applications"]?.arrayValue?.first?.objectValue)
         XCTAssertEqual(application["path"]?.stringValue, "/project/config/Apps/Example.app")
+        XCTAssertEqual(runtimeJSON.objectValue?["spacing"]?.numberValue, 6.5)
     }
 
     func testInvalidMatchApplicationPatternIsRejected() {
