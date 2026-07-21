@@ -630,7 +630,7 @@ function PinnedDockEditor({ item, onChange }: { item: ItemConfig; onChange(item:
   const [dropIndex, setDropIndex] = useState<number>();
   const configured = Array.isArray(item.applications) ? item.applications : [];
   const spacing = typeof item.spacing === "number" && Number.isFinite(item.spacing)
-    ? Math.max(0, Math.min(20, item.spacing))
+    ? Math.max(-12, Math.min(20, item.spacing))
     : 1;
   const catalogByIdentifier = useMemo(
     () => new Map(catalog.map((application) => [application.bundleIdentifier, application])),
@@ -675,7 +675,7 @@ function PinnedDockEditor({ item, onChange }: { item: ItemConfig; onChange(item:
   };
   const replaceSpacing = (value: number) => {
     if (!Number.isFinite(value)) return;
-    onChange({ ...item, spacing: Math.max(0, Math.min(20, value)) });
+    onChange({ ...item, spacing: Math.max(-12, Math.min(20, value)) });
   };
   const addIdentifier = (bundleIdentifier: string) => {
     const trimmed = bundleIdentifier.trim();
@@ -717,12 +717,12 @@ function PinnedDockEditor({ item, onChange }: { item: ItemConfig; onChange(item:
       <label class="pinned-dock-spacing">
         <span>
           <strong>Marge entre les icônes</strong>
-          <small>Espacement horizontal inclus dans la largeur automatique</small>
+          <small>Valeur négative = icônes plus serrées · incluse dans la largeur automatique</small>
         </span>
         <div class="pinned-dock-spacing-controls">
           <input
             type="range"
-            min="0"
+            min="-12"
             max="20"
             step="0.5"
             value={spacing}
@@ -731,7 +731,7 @@ function PinnedDockEditor({ item, onChange }: { item: ItemConfig; onChange(item:
           />
           <input
             type="number"
-            min="0"
+            min="-12"
             max="20"
             step="0.5"
             value={spacing}

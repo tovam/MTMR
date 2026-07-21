@@ -151,7 +151,7 @@ class ParseConfig: XCTestCase {
                   {"bundleIdentifier":"com.apple.Terminal","label":"Terminal","path":"/Applications/Terminal.app"}
                 ]
               },
-              {"type":"pinnedDock","applications":[],"spacing":6.5}
+              {"type":"pinnedDock","applications":[],"spacing":-6.5}
             ]
         """#.data(using: .utf8)!
 
@@ -169,7 +169,7 @@ class ParseConfig: XCTestCase {
         guard case let .pinnedDock(_, _, _, _, customSpacing) = decoded[1].type else {
             return XCTFail("Expected the custom-spacing pinnedDock runtime item")
         }
-        XCTAssertEqual(customSpacing, 6.5)
+        XCTAssertEqual(customSpacing, -6.5)
     }
 
     func testExtendedWidthForPredefinedItem() {

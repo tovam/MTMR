@@ -158,11 +158,11 @@ struct ConfigValidator {
             }
             if itemType == "pinnedDock",
                let spacing = item["spacing"]?.numberValue,
-               spacing < 0 || spacing > 20 {
+               spacing < -12 || spacing > 20 {
                 diagnostics.append(error(
                     "config.range",
                     "\(itemPath).spacing",
-                    "pinnedDock spacing must be from 0 through 20 points."
+                    "pinnedDock spacing must be from -12 through 20 points."
                 ))
             }
             if let interval = item["refreshInterval"]?.numberValue, interval < 0.001 {

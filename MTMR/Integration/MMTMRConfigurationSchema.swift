@@ -132,7 +132,7 @@ enum MMTMRConfigurationSchema {
                 ]),
                 "showRunningIndicator": boolProperty(defaultValue: true),
                 "longPressAction": enumProperty("none", "quit", defaultValue: "quit"),
-                "spacing": numberProperty(defaultValue: 1, minimum: 0, maximum: 20),
+                "spacing": numberProperty(defaultValue: 1, minimum: -12, maximum: 20),
             ], required: ["applications"]),
             itemVariant("volume", title: "Volume"),
             itemVariant("brightness", title: "Brightness", fields: ["refreshInterval": numberProperty(defaultValue: 0.5, minimum: 0.001)]),

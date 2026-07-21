@@ -31,6 +31,8 @@ describe("MediaControlIcon", () => {
     expect(memory.querySelectorAll(".system-usage-bar")).toHaveLength(60);
     expect(cpu.querySelector("text, circle")).not.toBeInTheDocument();
     expect(memory.querySelector("text, circle")).not.toBeInTheDocument();
+    expect(cpu.querySelector(".system-usage-background")).not.toBeInTheDocument();
+    expect(memory.querySelector(".system-usage-background")).not.toBeInTheDocument();
     expect(cpu.querySelector(".system-usage-bar")).toHaveAttribute("width", "1");
     expect(memory.querySelector(".system-usage-bar")).toHaveAttribute("width", "1");
   });

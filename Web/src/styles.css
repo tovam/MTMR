@@ -129,8 +129,7 @@ h3 { margin: 2px 0 0; font-size: 14px; }
 .palette-popover-icon .media-control-icon { width: 34px; height: 24px; }
 .media-icon-speaker-body { fill: currentColor; stroke: none; }
 .system-usage-icon { display: block; width: 30px; height: 30px; overflow: hidden; }
-.system-usage-background { fill: #1a1a1a; }
-.system-usage-bar { fill: #b8b8b8; }
+.system-usage-bar { fill: currentColor; opacity: .72; }
 .touch-item[data-kind="cpu"], .touch-item[data-kind="memory"] { width: 30px; min-width: 30px; height: 30px; padding: 0; gap: 0; border-color: transparent; border-radius: 0; background: transparent; }
 .touch-item[data-kind="cpu"]:hover, .touch-item[data-kind="memory"]:hover { background: transparent; border-color: #858c94; }
 .touch-item[data-kind="cpu"].is-selected, .touch-item[data-kind="memory"].is-selected { background: transparent; border-color: var(--blue); }

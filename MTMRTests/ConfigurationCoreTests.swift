@@ -134,6 +134,11 @@ final class ConfigurationCoreTests: XCTestCase {
             ],
             "longPressAction": "explode",
             "spacing": 21
+          }, {
+            "id": "too-tight",
+            "type": "pinnedDock",
+            "applications": [],
+            "spacing": -12.5
           }]
         }
         """#)
@@ -141,7 +146,7 @@ final class ConfigurationCoreTests: XCTestCase {
         XCTAssertTrue(duplicate.diagnostics.contains { $0.code == "config.duplicateApplication" })
         XCTAssertTrue(duplicate.diagnostics.contains { $0.code == "config.unknownKey" && $0.path.hasSuffix(".unknown") })
         XCTAssertTrue(duplicate.diagnostics.contains { $0.code == "config.enum" && $0.path.hasSuffix(".longPressAction") })
-        XCTAssertTrue(duplicate.diagnostics.contains { $0.code == "config.range" && $0.path.hasSuffix(".spacing") })
+        XCTAssertEqual(duplicate.diagnostics.filter { $0.code == "config.range" && $0.path.hasSuffix(".spacing") }.count, 2)
 
         let valid = codec.decode(#"""
         {
@@ -150,7 +155,7 @@ final class ConfigurationCoreTests: XCTestCase {
             "id": "fixed-apps",
             "type": "pinnedDock",
             "applications": [{"bundleIdentifier":"com.example.App","path":"Apps/Example.app"}],
-            "spacing": 6.5
+            "spacing": -6.5
           }]
         }
         """#)
@@ -161,7 +166,18 @@ final class ConfigurationCoreTests: XCTestCase {
         let runtimeJSON = try JSONDecoder().decode(JSONValue.self, from: runtime.data)
         let application = try XCTUnwrap(runtimeJSON.objectValue?["applications"]?.arrayValue?.first?.objectValue)
         XCTAssertEqual(application["path"]?.stringValue, "/project/config/Apps/Example.app")
-        XCTAssertEqual(runtimeJSON.objectValue?["spacing"]?.numberValue, 6.5)
+        XCTAssertEqual(runtimeJSON.objectValue?["spacing"]?.numberValue, -6.5)
+
+        let definitions = try XCTUnwrap(MMTMRConfigurationSchema.document.objectValue?["$defs"]?.objectValue)
+        guard case let .array(variants)? = definitions["item"]?.objectValue?["oneOf"] else {
+            return XCTFail("The item schema must expose oneOf variants.")
+        }
+        let pinnedDock = try XCTUnwrap(variants.first {
+            $0.objectValue?["properties"]?.objectValue?["type"]?.objectValue?["const"] == .string("pinnedDock")
+        })
+        let spacingSchema = try XCTUnwrap(pinnedDock.objectValue?["properties"]?.objectValue?["spacing"]?.objectValue)
+        XCTAssertEqual(spacingSchema["minimum"], .number(-12))
+        XCTAssertEqual(spacingSchema["maximum"], .number(20))
     }
 
     func testInvalidMatchApplicationPatternIsRejected() {

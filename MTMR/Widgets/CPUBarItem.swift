@@ -107,7 +107,7 @@ private final class SystemUsageGraphView: NSView, RuntimeRenderSignatureProvidin
     }
 
     override var intrinsicContentSize: NSSize { Self.size }
-    override var isOpaque: Bool { true }
+    override var isOpaque: Bool { false }
     var runtimeRenderSignature: String { String(revision) }
 
     func append(_ usage: Double) {
@@ -127,8 +127,12 @@ private final class SystemUsageGraphView: NSView, RuntimeRenderSignatureProvidin
         defer { context.restoreGraphicsState() }
         context.shouldAntialias = false
 
-        NSColor(calibratedWhite: 0.10, alpha: 1).setFill()
+        // Clear our own pixels instead of painting a card behind the graph.
+        // The native Touch Bar background remains visible through the view.
+        context.compositingOperation = .copy
+        NSColor.clear.setFill()
         bounds.fill()
+        context.compositingOperation = .sourceOver
 
         let scale = max(1, window?.backingScaleFactor ?? NSScreen.main?.backingScaleFactor ?? 2)
         let pixel = 1 / scale

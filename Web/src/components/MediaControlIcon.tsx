@@ -97,7 +97,6 @@ export function SystemUsageIcon({ kind }: { kind: SystemUsageKind }) {
       data-kind={kind}
       shape-rendering="crispEdges"
     >
-      <rect class="system-usage-background" x="0" y="0" width="60" height="60" />
       {samples.map((sample, index) => {
         const height = Math.max(1, Math.floor(sample * 60));
         return <rect class="system-usage-bar" key={index} x={index} y={60 - height} width="1" height={height} />;

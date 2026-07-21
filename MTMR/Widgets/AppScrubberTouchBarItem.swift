@@ -221,7 +221,7 @@ class PinnedAppDockTouchBarItem: NSCustomTouchBarItem {
         definitions = applications
         self.showRunningIndicator = showRunningIndicator
         self.longPressAction = longPressAction
-        self.spacing = CGFloat(min(20, max(0, spacing)))
+        self.spacing = CGFloat(min(20, max(-12, spacing)))
         super.init(identifier: identifier)
         view = scrollView
 
