@@ -177,6 +177,22 @@ Une instance déjà lancée sert immédiatement les nouveaux fichiers après act
 ./Tools/install-web-editor.sh ./MMTMR.app "Nom de l’identité de signature"
 ```
 
+Les artefacts produits par GitHub Actions sont signés ad hoc : si on les copie
+directement dans `/Applications`, leur identité macOS dépend du hash du build et
+l’autorisation Accessibilité est perdue à chaque mise à jour. Pour installer un
+build complet, le signer avec la même identité locale stable à chaque fois :
+
+```bash
+security find-identity -v -p codesigning
+./Tools/install-development-build.sh ./MMTMR.app "Nom exact de l’identité stable"
+```
+
+Le script signe uniquement l’application extérieure, vérifie que son exigence
+désignée ne dépend pas d’un `cdhash`, conserve l’ancienne application dans
+`build-checks/local-installs`, puis installe la copie vérifiée. macOS demande une
+dernière autorisation lors du passage à cette identité ; les mises à jour
+suivantes la conservent tant que la même identité est réutilisée.
+
 Les options suivantes sont réservées aux tests et builds Debug :
 
 ```text
