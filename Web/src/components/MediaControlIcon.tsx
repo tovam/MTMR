@@ -1,3 +1,5 @@
+import { useId } from "preact/hooks";
+
 export type MediaControlKind = "brightnessUp" | "brightnessDown" | "volumeUp" | "volumeDown";
 export type SystemUsageKind = "cpu" | "memory";
 
@@ -88,6 +90,7 @@ function systemUsageSamples(kind: SystemUsageKind): number[] {
 /** Pixel-column preview matching the native CPU/RAM history graph. */
 export function SystemUsageIcon({ kind }: { kind: SystemUsageKind }) {
   const samples = systemUsageSamples(kind);
+  const gradientID = `${useId()}-system-usage-gradient`;
   return (
     <svg
       class="system-usage-icon"
@@ -97,9 +100,28 @@ export function SystemUsageIcon({ kind }: { kind: SystemUsageKind }) {
       data-kind={kind}
       shape-rendering="crispEdges"
     >
+      <defs>
+        <linearGradient id={gradientID} gradientUnits="userSpaceOnUse" x1="0" y1="60" x2="0" y2="0">
+          <stop offset="0%" stop-color="#45b77a" />
+          <stop offset="55%" stop-color="#45b77a" />
+          <stop offset="70%" stop-color="#d3b54a" />
+          <stop offset="85%" stop-color="#d68145" />
+          <stop offset="100%" stop-color="#d65353" />
+        </linearGradient>
+      </defs>
       {samples.map((sample, index) => {
         const height = Math.max(1, Math.floor(sample * 60));
-        return <rect class="system-usage-bar" key={index} x={index} y={60 - height} width="1" height={height} />;
+        return (
+          <rect
+            class="system-usage-bar"
+            key={index}
+            x={index}
+            y={60 - height}
+            width="1"
+            height={height}
+            fill={`url(#${gradientID})`}
+          />
+        );
       })}
     </svg>
   );

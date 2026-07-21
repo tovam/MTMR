@@ -35,5 +35,21 @@ describe("MediaControlIcon", () => {
     expect(memory.querySelector(".system-usage-background")).not.toBeInTheDocument();
     expect(cpu.querySelector(".system-usage-bar")).toHaveAttribute("width", "1");
     expect(memory.querySelector(".system-usage-bar")).toHaveAttribute("width", "1");
+
+    const gradient = cpu.querySelector("linearGradient");
+    expect(gradient).toHaveAttribute("gradientUnits", "userSpaceOnUse");
+    expect(gradient).toHaveAttribute("y1", "60");
+    expect(gradient).toHaveAttribute("y2", "0");
+    expect([...cpu.querySelectorAll("stop")].map((stop) => [
+      stop.getAttribute("offset"),
+      stop.getAttribute("stop-color"),
+    ])).toEqual([
+      ["0%", "#45b77a"],
+      ["55%", "#45b77a"],
+      ["70%", "#d3b54a"],
+      ["85%", "#d68145"],
+      ["100%", "#d65353"],
+    ]);
+    expect(cpu.querySelector(".system-usage-bar")?.getAttribute("fill")).toBe(`url(#${gradient?.id})`);
   });
 });

@@ -95,6 +95,16 @@ private struct SystemUsageSampler {
 private final class SystemUsageGraphView: NSView, RuntimeRenderSignatureProviding {
     static let size = NSSize(width: 30, height: 30)
 
+    // Calm at normal load, increasingly warm only in the upper range.
+    private static let loadGradient = NSGradient(
+        colorsAndLocations:
+        (NSColor(srgbRed: 0.27, green: 0.72, blue: 0.48, alpha: 0.95), 0.00),
+        (NSColor(srgbRed: 0.27, green: 0.72, blue: 0.48, alpha: 0.95), 0.55),
+        (NSColor(srgbRed: 0.83, green: 0.71, blue: 0.29, alpha: 0.95), 0.70),
+        (NSColor(srgbRed: 0.84, green: 0.51, blue: 0.27, alpha: 0.95), 0.85),
+        (NSColor(srgbRed: 0.84, green: 0.33, blue: 0.33, alpha: 0.95), 1.00)
+    )
+
     private var samples: [CGFloat] = []
     private var revision: UInt64 = 0
 
@@ -140,17 +150,23 @@ private final class SystemUsageGraphView: NSView, RuntimeRenderSignatureProvidin
         let visibleSamples = samples.suffix(capacity)
         let startingX = bounds.maxX - CGFloat(visibleSamples.count) * pixel
 
-        NSColor(calibratedWhite: 0.72, alpha: 1).setFill()
+        let bars = NSBezierPath()
         for (index, sample) in visibleSamples.enumerated() {
             let height = (sample * bounds.height * scale).rounded(.down) / scale
             guard height > 0 else { continue }
-            NSRect(
+            bars.appendRect(NSRect(
                 x: startingX + CGFloat(index) * pixel,
                 y: bounds.minY,
                 width: pixel,
                 height: min(bounds.height, height)
-            ).fill()
+            ))
         }
+        bars.addClip()
+        Self.loadGradient?.draw(
+            from: NSPoint(x: bounds.midX, y: bounds.minY),
+            to: NSPoint(x: bounds.midX, y: bounds.maxY),
+            options: []
+        )
     }
 }
 
