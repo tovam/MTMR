@@ -47,6 +47,73 @@ final class ConfigurationCoreTests: XCTestCase {
         XCTAssertEqual(duplicate.diagnostics.first?.path, "$.formatVersion")
     }
 
+    func testTouchBarChassisCalibrationRoundTripsPerHardwareModel() throws {
+        let source = #"""
+        {
+          "formatVersion": 1,
+          "touchBarLayout": {
+            "centerReference": "chassis",
+            "calibrations": {
+              "MacBookPro16,1": {
+                "centerOffset": -38.5,
+                "pointsPerMillimeter": 4.27
+              }
+            }
+          },
+          "items": []
+        }
+        """#
+
+        let result = codec.decode(source)
+        XCTAssertTrue(result.isValid, "\(result.diagnostics)")
+        let layout = try XCTUnwrap(result.document?.touchBarLayout)
+        XCTAssertEqual(layout.centerReference, .chassis)
+        XCTAssertEqual(layout.calibration(for: "MacBookPro16,1")?.centerOffset, -38.5)
+        XCTAssertEqual(layout.calibration(for: "MacBookPro16,1")?.pointsPerMillimeter, 4.27)
+
+        let canonical = try XCTUnwrap(result.canonicalSource)
+        XCTAssertTrue(canonical.contains(#""touchBarLayout""#))
+        XCTAssertTrue(codec.decode(canonical).isValid)
+    }
+
+    func testTouchBarChassisCalibrationRejectsUnknownAndUnsafeValues() {
+        let result = codec.decode(#"""
+        {
+          "formatVersion": 1,
+          "touchBarLayout": {
+            "centerReference": "desk",
+            "unknown": true,
+            "calibrations": {
+              "MacBookPro16,1": {
+                "centerOffset": 301,
+                "pointsPerMillimeter": 1,
+                "typo": 1
+              }
+            }
+          },
+          "items": []
+        }
+        """#)
+
+        XCTAssertFalse(result.isValid)
+        XCTAssertTrue(result.diagnostics.contains {
+            $0.code == "config.enum" && $0.path == "$.touchBarLayout.centerReference"
+        })
+        XCTAssertTrue(result.diagnostics.contains {
+            $0.code == "config.unknownKey" && $0.path == "$.touchBarLayout.unknown"
+        })
+        XCTAssertEqual(
+            result.diagnostics.filter {
+                $0.code == "config.range"
+                    && $0.path.hasPrefix("$.touchBarLayout.calibrations.MacBookPro16,1")
+            }.count,
+            2
+        )
+        XCTAssertTrue(result.diagnostics.contains {
+            $0.code == "config.unknownKey" && $0.path.hasSuffix(".typo")
+        })
+    }
+
     func testValidationRejectsUnknownKeysTypesAndDuplicateIDs() {
         let result = codec.decode(#"""
         {

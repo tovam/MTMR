@@ -31,10 +31,31 @@ export interface ItemConfig extends JsonObject {
   applications?: PinnedApplicationConfig[];
 }
 
+export interface TouchBarCalibrationProfile extends JsonObject {
+  centerOffset: number;
+  pointsPerMillimeter: number;
+}
+
+export interface TouchBarLayoutConfig extends JsonObject {
+  centerReference: "touchBar" | "chassis";
+  calibrations: Record<string, TouchBarCalibrationProfile>;
+}
+
+export interface TouchBarCalibrationState extends JsonObject {
+  active: boolean;
+  hardwareModel: string;
+  centerReference: "touchBar" | "chassis";
+  centerOffset: number;
+  pointsPerMillimeter: number;
+  guideWidthMillimeters: number;
+  calibrated: boolean;
+}
+
 export interface ConfigDocument extends JsonObject {
   $schema?: string;
   formatVersion: number;
   notes?: string;
+  touchBarLayout?: TouchBarLayoutConfig;
   items: ItemConfig[];
 }
 

@@ -7,6 +7,7 @@ import type {
   ServerStatus,
   SimulationContext,
   SocketEvent,
+  TouchBarCalibrationState,
   ValidationEnvelope,
 } from "./types";
 
@@ -66,6 +67,15 @@ export const api = {
     }),
   simulateAction: (body: { itemID?: string; trigger?: string; action?: JsonObject }) =>
     request<{ executed: false; description: string; event?: SocketEvent }>("/api/v1/preview/action", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  setTouchBarCalibration: (body: {
+    active: boolean;
+    centerOffset?: number;
+    pointsPerMillimeter?: number;
+  }) =>
+    request<{ state: TouchBarCalibrationState }>("/api/v1/touchbar/calibration", {
       method: "POST",
       body: JSON.stringify(body),
     }),

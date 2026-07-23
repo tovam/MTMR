@@ -33,4 +33,16 @@ describe("computeTouchBarZoneFrames", () => {
     expect(frames.right.width).toBe(499);
     expect(frames.left.x + frames.left.width + TOUCH_BAR_GROUP_SPACING).toBe(frames.right.x);
   });
+
+  it("anchors the center to a calibrated chassis coordinate", () => {
+    const frames = computeTouchBarZoneFrames(
+      1_000,
+      { left: 400, center: 100, right: 250 },
+      TOUCH_BAR_GROUP_SPACING,
+      462,
+    );
+    expect(frames.left.x).toBe(0);
+    expect(frames.center.x + frames.center.width / 2).toBe(462);
+    expect(frames.right.x + frames.right.width).toBe(1_000);
+  });
 });

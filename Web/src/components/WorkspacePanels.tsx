@@ -10,10 +10,13 @@ import type {
   ItemConfig,
   SaveState,
   SimulationContext,
+  JsonObject,
+  TouchBarCalibrationState,
 } from "../types";
 import { CodeEditor } from "./CodeEditor";
 import { Diagnostics } from "./Diagnostics";
 import { clearDragPayload, getDragPayload, setDragPayload } from "./Palette";
+import { TouchBarCalibration } from "./TouchBarCalibration";
 
 interface WorkspacePanelsProps {
   tab: EditorTab;
@@ -24,18 +27,25 @@ interface WorkspacePanelsProps {
   simulation: SimulationContext;
   simulationDirect: boolean;
   simulationResult: string;
+  runtimeSnapshot?: JsonObject;
   selectedItem?: ItemConfig;
   saveState: SaveState;
   editingLocked?: boolean;
   onTab(tab: EditorTab): void;
   onSource(source: string): void;
   onDocument(document: ConfigDocument): void;
+  onSaveDocument(document: ConfigDocument): Promise<void>;
   onSelectItem(id: string): void;
   onMoveTreeItem(id: string, parentID: string | undefined, align: Alignment | undefined, beforeID?: string): void;
   onSimulation(context: SimulationContext): void;
   onBeginSimulation(): void;
   onResetSimulation(): void;
   onSimulateAction(itemID?: string, trigger?: string): void;
+  onTouchBarCalibration(request: {
+    active: boolean;
+    centerOffset?: number;
+    pointsPerMillimeter?: number;
+  }): Promise<TouchBarCalibrationState | undefined>;
 }
 
 const TABS: Array<{ id: EditorTab; label: string }> = [
@@ -62,8 +72,22 @@ function FormPanel({
   onDocument,
   onSelectItem,
   onMoveTreeItem,
+  runtimeSnapshot,
+  onSaveDocument,
+  onTouchBarCalibration,
   editingLocked,
-}: Pick<WorkspacePanelsProps, "document" | "diagnostics" | "onDocument" | "onSelectItem" | "onMoveTreeItem" | "editingLocked">) {
+}: Pick<
+  WorkspacePanelsProps,
+  | "document"
+  | "diagnostics"
+  | "onDocument"
+  | "onSaveDocument"
+  | "onSelectItem"
+  | "onMoveTreeItem"
+  | "runtimeSnapshot"
+  | "onTouchBarCalibration"
+  | "editingLocked"
+>) {
   const [orderDropTarget, setOrderDropTarget] = useState<OrderDropTarget>();
   const flattenedItems = flattenItems(document.items);
 
@@ -255,6 +279,13 @@ function FormPanel({
           />
         </label>
       </section>
+      <TouchBarCalibration
+        document={document}
+        runtimeSnapshot={runtimeSnapshot}
+        editingLocked={editingLocked}
+        onPreview={onTouchBarCalibration}
+        onSave={onSaveDocument}
+      />
       <section class="content-card full-width">
         <div class="card-heading">
           <div>
@@ -446,6 +477,14 @@ function eventPresentation(event: EventRecord): { category: Exclude<EventCategor
   if (event.type.startsWith("simulation.")) {
     return { category: "preview", label: event.type === "simulation.action" ? "Action décrite" : "Contexte d’aperçu modifié", detail: "Aucun effet sur le Mac.", origin: ["simulation.action", "simulation.local"].includes(event.type) ? "Produit par l’éditeur" : "Synchronisé avec MMTMR" };
   }
+  if (event.type.startsWith("touchbar.calibration.")) {
+    return {
+      category: "preview",
+      label: event.type.endsWith(".finished") ? "Calibration terminée" : "Repère physique actualisé",
+      detail: event.detail,
+      origin: "Synchronisé avec MMTMR",
+    };
+  }
   if (["item.", "document.", "draft."].some((prefix) => event.type.startsWith(prefix))) {
     return { category: "edit", label: "Brouillon modifié", detail: "Modification locale de l’éditeur.", origin: "Produit par l’éditeur" };
   }
@@ -522,10 +561,13 @@ export function WorkspacePanels(props: WorkspacePanelsProps) {
           <FormPanel
             document={props.document}
             diagnostics={props.diagnostics}
+            runtimeSnapshot={props.runtimeSnapshot}
             editingLocked={props.editingLocked}
             onDocument={props.onDocument}
+            onSaveDocument={props.onSaveDocument}
             onSelectItem={props.onSelectItem}
             onMoveTreeItem={props.onMoveTreeItem}
+            onTouchBarCalibration={props.onTouchBarCalibration}
           />
         )}
         {props.tab === "json" && (

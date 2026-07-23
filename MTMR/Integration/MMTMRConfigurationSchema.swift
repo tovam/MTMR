@@ -17,6 +17,7 @@ enum MMTMRConfigurationSchema {
                 "description": .string("Version of the canonical MMTMR JSON format."),
             ]),
             "notes": stringProperty("Free-form configuration notes."),
+            "touchBarLayout": reference("#/$defs/touchBarLayout"),
             "items": .object([
                 "type": .string("array"),
                 "items": reference("#/$defs/item"),
@@ -26,7 +27,37 @@ enum MMTMRConfigurationSchema {
             "source": sourceDefinition,
             "action": actionDefinition,
             "pinnedApplication": pinnedApplicationDefinition,
+            "touchBarCalibration": touchBarCalibrationDefinition,
+            "touchBarLayout": touchBarLayoutDefinition,
             "item": itemDefinition,
+        ]),
+    ])
+
+    private static let touchBarCalibrationDefinition: JSON = .object([
+        "type": .string("object"),
+        "additionalProperties": .bool(false),
+        "required": strings("centerOffset", "pointsPerMillimeter"),
+        "properties": .object([
+            "centerOffset": numberProperty(defaultValue: 0, minimum: -300, maximum: 300),
+            "pointsPerMillimeter": numberProperty(
+                defaultValue: TouchBarCalibrationProfile.defaultPointsPerMillimeter,
+                minimum: 2,
+                maximum: 8
+            ),
+        ]),
+    ])
+
+    private static let touchBarLayoutDefinition: JSON = .object([
+        "type": .string("object"),
+        "additionalProperties": .bool(false),
+        "required": strings("centerReference", "calibrations"),
+        "properties": .object([
+            "centerReference": enumProperty("touchBar", "chassis", defaultValue: "touchBar"),
+            "calibrations": .object([
+                "type": .string("object"),
+                "additionalProperties": reference("#/$defs/touchBarCalibration"),
+                "default": .object([:]),
+            ]),
         ]),
     ])
 

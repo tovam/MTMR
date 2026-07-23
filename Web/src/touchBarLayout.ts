@@ -24,16 +24,20 @@ export function computeTouchBarZoneFrames(
   containerWidth: number,
   naturalWidths: TouchBarZoneWidths,
   spacing = TOUCH_BAR_GROUP_SPACING,
+  requestedCenterX?: number,
 ): TouchBarZoneFrames {
   const width = safe(containerWidth);
   const leftNatural = safe(naturalWidths.left);
   const centerNatural = safe(naturalWidths.center);
   const rightNatural = safe(naturalWidths.right);
   const safeSpacing = safe(spacing);
+  const centerAnchor = Number.isFinite(requestedCenterX)
+    ? Math.max(0, Math.min(width, requestedCenterX as number))
+    : width / 2;
 
   if (centerNatural > 0) {
     const centerWidth = Math.min(centerNatural, width);
-    const centerX = (width - centerWidth) / 2;
+    const centerX = Math.max(0, Math.min(width - centerWidth, centerAnchor - centerWidth / 2));
     const leftWidth = Math.min(leftNatural, Math.max(0, centerX - safeSpacing));
     const rightCapacity = Math.max(0, width - (centerX + centerWidth) - safeSpacing);
     const rightWidth = Math.min(rightNatural, rightCapacity);
@@ -63,7 +67,7 @@ export function computeTouchBarZoneFrames(
 
   return {
     left: { x: 0, width: leftWidth },
-    center: { x: width / 2, width: 0 },
+    center: { x: centerAnchor, width: 0 },
     right: { x: width - rightWidth, width: rightWidth },
   };
 }

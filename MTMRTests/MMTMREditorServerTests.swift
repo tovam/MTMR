@@ -280,6 +280,34 @@ final class MMTMREditorServerTests: XCTestCase {
         }
     }
 
+    func testTouchBarCalibrationRouteIsAuthenticatedAndRangeChecked() async throws {
+        let server = makeServer(provider: EditorServerTestProvider())
+        let app = server.makeApplication()
+
+        try await app.test(.router) { client in
+            let cookie = try await Self.sessionCookie(client)
+            let valid = try await client.execute(
+                uri: "/api/v1/touchbar/calibration",
+                method: .post,
+                headers: Self.mutationHeaders(cookie: cookie),
+                body: ByteBuffer(string: #"{"active":true,"centerOffset":-38.5,"pointsPerMillimeter":4.27}"#)
+            )
+            XCTAssertEqual(valid.status, .ok)
+            let state = try Self.decodeJSON(valid.body).objectValue?["state"]?.objectValue
+            XCTAssertEqual(state?["active"], .bool(true))
+            XCTAssertEqual(state?["centerOffset"], .number(-38.5))
+            XCTAssertEqual(state?["guideWidthMillimeters"], .number(30))
+
+            let invalid = try await client.execute(
+                uri: "/api/v1/touchbar/calibration",
+                method: .post,
+                headers: Self.mutationHeaders(cookie: cookie),
+                body: ByteBuffer(string: #"{"active":true,"centerOffset":301}"#)
+            )
+            XCTAssertEqual(invalid.status, .unprocessableContent)
+        }
+    }
+
     func testBodyLimitAndMutationRateLimit() async throws {
         let provider = EditorServerTestProvider()
         let configuration = MMTMREditorServerConfiguration(

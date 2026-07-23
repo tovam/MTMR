@@ -27,6 +27,19 @@ final class InputDispatchTests: XCTestCase {
         XCTAssertEqual(frames.right.maxX, 1_000, accuracy: 0.001)
     }
 
+    func testChassisCalibrationMovesTheCenterWithoutMovingTheEdges() {
+        let frames = TouchBarPhysicalLayout.frames(
+            in: CGRect(x: 0, y: 0, width: 1_000, height: 30),
+            naturalWidths: TouchBarZoneWidths(left: 400, center: 100, right: 250),
+            centerX: 462
+        )
+
+        XCTAssertEqual(frames.left.minX, 0, accuracy: 0.001)
+        XCTAssertEqual(frames.center.midX, 462, accuracy: 0.001)
+        XCTAssertEqual(frames.right.maxX, 1_000, accuracy: 0.001)
+        XCTAssertEqual(frames.center.minX, 412, accuracy: 0.001)
+    }
+
     func testPhysicalTouchBarLetsAnAsymmetricSideUseOtherwiseEmptySpace() {
         let frames = TouchBarPhysicalLayout.frames(
             in: CGRect(x: 0, y: 0, width: 1_000, height: 30),

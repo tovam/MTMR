@@ -22,6 +22,7 @@ import type {
   ServerStatus,
   SimulationContext,
   SocketEvent,
+  TouchBarCalibrationState,
 } from "./types";
 
 const MAX_HISTORY = 100;
@@ -486,6 +487,34 @@ export function useEditorState() {
     appendEvent("simulation.local", "Retour au mode Direct.");
   }, [appendEvent]);
 
+  const updateTouchBarCalibration = useCallback(async (request: {
+    active: boolean;
+    centerOffset?: number;
+    pointsPerMillimeter?: number;
+  }): Promise<TouchBarCalibrationState | undefined> => {
+    try {
+      const envelope = await api.setTouchBarCalibration(request);
+      setRuntimeSnapshot((current) => ({
+        ...(current ?? {}),
+        touchBarLayout: envelope.state,
+      }));
+      appendEvent(
+        request.active ? "touchbar.calibration.changed" : "touchbar.calibration.finished",
+        request.active
+          ? `Repère physique déplacé à ${envelope.state.centerOffset.toFixed(1)} pt.`
+          : "Repère physique masqué.",
+      );
+      return envelope.state;
+    } catch (error) {
+      setDiagnostics(diagnosticsFromError(error));
+      appendEvent(
+        "touchbar.calibration.error",
+        error instanceof Error ? error.message : String(error),
+      );
+      return undefined;
+    }
+  }, [appendEvent]);
+
   const selectedItem = useMemo(
     () => findItem(history.present, selectedID),
     [history.present, selectedID],
@@ -527,5 +556,6 @@ export function useEditorState() {
     beginSimulation,
     resetSimulation,
     simulateAction,
+    updateTouchBarCalibration,
   };
 }

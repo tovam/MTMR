@@ -163,6 +163,22 @@ struct ServerApplicationCatalog: Codable, Equatable, Sendable {
     }
 }
 
+struct ServerTouchBarCalibrationRequest: Codable, Equatable, Sendable {
+    let active: Bool
+    let centerOffset: Double?
+    let pointsPerMillimeter: Double?
+}
+
+struct ServerTouchBarCalibrationState: Codable, Equatable, Sendable {
+    let active: Bool
+    let hardwareModel: String
+    let centerReference: String
+    let centerOffset: Double
+    let pointsPerMillimeter: Double
+    let guideWidthMillimeters: Double
+    let calibrated: Bool
+}
+
 /// The only configuration-core contract required by the embedded editor server.
 ///
 /// Implementations are expected to serialize mutations internally. In particular,
@@ -174,11 +190,29 @@ protocol ServerConfigurationProviding: Sendable {
     func validateConfiguration(source: String) async throws -> ServerValidationResult
     func replaceConfiguration(source: String, expectedRevision: Int) async throws -> ServerConfigurationWriteResult
     func applicationCatalog() async throws -> ServerApplicationCatalog
+    func updateTouchBarCalibration(
+        _ request: ServerTouchBarCalibrationRequest
+    ) async throws -> ServerTouchBarCalibrationState
 }
 
 extension ServerConfigurationProviding {
     func applicationCatalog() async throws -> ServerApplicationCatalog {
         ServerApplicationCatalog(applications: [])
+    }
+
+    func updateTouchBarCalibration(
+        _ request: ServerTouchBarCalibrationRequest
+    ) async throws -> ServerTouchBarCalibrationState {
+        ServerTouchBarCalibrationState(
+            active: request.active,
+            hardwareModel: "unknown",
+            centerReference: request.active ? "chassis" : "touchBar",
+            centerOffset: request.centerOffset ?? 0,
+            pointsPerMillimeter: request.pointsPerMillimeter
+                ?? TouchBarCalibrationProfile.defaultPointsPerMillimeter,
+            guideWidthMillimeters: TouchBarLayoutRuntimeState.calibrationGuideWidthMillimeters,
+            calibrated: false
+        )
     }
 }
 

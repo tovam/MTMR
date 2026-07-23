@@ -71,6 +71,34 @@ Chaque item possède un `id` stable et unique. Cet identifiant est utilisé par 
 
 Les chemins relatifs sont résolus depuis le dossier contenant le fichier de configuration. Les chemins commençant par `~/` restent acceptés.
 
+### Centre physique du châssis
+
+La zone `center` peut être alignée sur le milieu physique du Mac plutôt que sur
+le milieu de la surface tactile disponible. L’éditeur propose **Calibrer ce
+Mac** : la Touch Bar physique affiche une ligne centrale d’un pixel dans une
+zone rouge de 30 mm, puis le décalage est enregistré pour le modèle matériel
+courant.
+
+```json
+{
+  "touchBarLayout": {
+    "centerReference": "chassis",
+    "calibrations": {
+      "MacBookPro16,1": {
+        "centerOffset": -38.5,
+        "pointsPerMillimeter": 4.27
+      }
+    }
+  }
+}
+```
+
+MMTMR obtient l’identifiant `hw.model` localement et accepte un profil
+`default` comme repli. `centerOffset` est exprimé en points Touch Bar, positif
+vers la droite. `pointsPerMillimeter` conserve une largeur physique de 30 mm au
+repère de calibration. Les zones gauche et droite restent attachées aux bords
+visibles et sont réduites avant de déplacer le centre calibré.
+
 ### Dock d’applications fixe
 
 `pinnedDock` affiche exactement les applications déclarées, dans le même ordre, qu’elles soient ouvertes ou fermées. Un toucher active une application ouverte ou lance une application fermée. L’éditeur propose un catalogue visuel, une recherche et un réordonnancement ; le JSON reste la seule source de vérité.
@@ -146,6 +174,7 @@ Routes :
 - `PUT /api/v1/config` avec `If-Match` ;
 - `POST /api/v1/preview/context` ;
 - `POST /api/v1/preview/action` ;
+- `POST /api/v1/touchbar/calibration` (repère temporaire, sans écriture directe du fichier) ;
 - `WS /api/v1/events`.
 
 Événements WebSocket : `config.changed`, `config.invalid`, `runtime.snapshot`, `simulation.changed` et `server.error`.

@@ -7,15 +7,32 @@ final class ConfigurationServerAdapter: ServerConfigurationProviding, @unchecked
     private let coordinator: ConfigurationCoordinator
     private let runtimeValidator: @Sendable (ConfigDocument) async -> [ConfigurationDiagnostic]
     private let onAccepted: @Sendable (ConfigurationSnapshot) async throws -> Void
+    private let touchBarCalibrationHandler:
+        @Sendable (ServerTouchBarCalibrationRequest) async throws -> ServerTouchBarCalibrationState
 
     init(
         coordinator: ConfigurationCoordinator,
         runtimeValidator: @escaping @Sendable (ConfigDocument) async -> [ConfigurationDiagnostic] = { _ in [] },
-        onAccepted: @escaping @Sendable (ConfigurationSnapshot) async throws -> Void = { _ in }
+        onAccepted: @escaping @Sendable (ConfigurationSnapshot) async throws -> Void = { _ in },
+        touchBarCalibrationHandler:
+            @escaping @Sendable (ServerTouchBarCalibrationRequest) async throws -> ServerTouchBarCalibrationState = {
+                request in
+                ServerTouchBarCalibrationState(
+                    active: request.active,
+                    hardwareModel: "unknown",
+                    centerReference: request.active ? "chassis" : "touchBar",
+                    centerOffset: request.centerOffset ?? 0,
+                    pointsPerMillimeter: request.pointsPerMillimeter
+                        ?? TouchBarCalibrationProfile.defaultPointsPerMillimeter,
+                    guideWidthMillimeters: TouchBarLayoutRuntimeState.calibrationGuideWidthMillimeters,
+                    calibrated: false
+                )
+            }
     ) {
         self.coordinator = coordinator
         self.runtimeValidator = runtimeValidator
         self.onAccepted = onAccepted
+        self.touchBarCalibrationHandler = touchBarCalibrationHandler
     }
 
     func configurationSnapshot() async throws -> ServerConfigurationSnapshot {
@@ -96,6 +113,12 @@ final class ConfigurationServerAdapter: ServerConfigurationProviding, @unchecked
 
     func applicationCatalog() async throws -> ServerApplicationCatalog {
         await InstalledApplicationCatalog.shared.snapshot()
+    }
+
+    func updateTouchBarCalibration(
+        _ request: ServerTouchBarCalibrationRequest
+    ) async throws -> ServerTouchBarCalibrationState {
+        try await touchBarCalibrationHandler(request)
     }
 
     func serverSnapshot(_ snapshot: ConfigurationSnapshot) -> ServerConfigurationSnapshot {

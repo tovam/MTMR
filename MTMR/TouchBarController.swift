@@ -150,6 +150,11 @@ class TouchBarController: NSObject, NSTouchBarDelegate {
     let basicViewIdentifier = NSTouchBarItem.Identifier("com.tovam.MMTMR.scrollView")
     var basicView: BasicView?
     var swipeItems: [SwipeItem] = []
+    private let hardwareProfile = TouchBarHardwareProfile.current
+    private var layoutConfiguration: TouchBarLayoutConfiguration?
+    private var calibrationPreviewActive = false
+    private var calibrationPreviewOffset: Double?
+    private var calibrationPreviewPointsPerMillimeter: Double?
 
     var blacklistAppIdentifiers: [String] = []
     var frontmostApplicationIdentifier: String? {
@@ -202,12 +207,17 @@ class TouchBarController: NSObject, NSTouchBarDelegate {
         apply(runtimeItems: runtimeItems)
     }
 
-    func apply(runtimeItems: [RuntimeBarItem]) {
+    func apply(
+        runtimeItems: [RuntimeBarItem],
+        layoutConfiguration: TouchBarLayoutConfiguration? = nil
+    ) {
         if touchBar == nil {
             touchBar = NSTouchBar()
         }
+        self.layoutConfiguration = layoutConfiguration
         touchBar.delegate = self
         touchBar.defaultItemIdentifiers = [basicViewIdentifier]
+        touchBar.principalItemIdentifier = basicViewIdentifier
 
         jsonItems = runtimeItems.map(\.definition)
         itemDefinitions = [:]
@@ -245,6 +255,7 @@ class TouchBarController: NSObject, NSTouchBarDelegate {
         renderedOrder = newOrder
 
         if !changed {
+            updateBasicViewLayout()
             return
         }
         
@@ -276,6 +287,57 @@ class TouchBarController: NSObject, NSTouchBarDelegate {
             )
         }
         basicView?.legacyGesturesEnabled = AppSettings.multitouchGestures
+        updateBasicViewLayout()
+    }
+
+    func currentTouchBarLayoutState() -> TouchBarLayoutRuntimeState {
+        let storedProfile = layoutConfiguration?.calibration(for: hardwareProfile.modelIdentifier)
+        let activeReference: TouchBarCenterReference = calibrationPreviewActive
+            ? .chassis
+            : layoutConfiguration?.centerReference ?? .touchBar
+        return TouchBarLayoutRuntimeState(
+            hardwareModel: hardwareProfile.modelIdentifier,
+            centerReference: activeReference,
+            centerOffset: calibrationPreviewActive
+                ? calibrationPreviewOffset ?? storedProfile?.centerOffset ?? 0
+                : storedProfile?.centerOffset ?? 0,
+            pointsPerMillimeter: calibrationPreviewActive
+                ? calibrationPreviewPointsPerMillimeter
+                    ?? storedProfile?.pointsPerMillimeter
+                    ?? TouchBarCalibrationProfile.defaultPointsPerMillimeter
+                : storedProfile?.pointsPerMillimeter
+                    ?? TouchBarCalibrationProfile.defaultPointsPerMillimeter,
+            calibrated: storedProfile != nil,
+            calibrationActive: calibrationPreviewActive
+        )
+    }
+
+    @discardableResult
+    func updateCalibrationPreview(
+        active: Bool,
+        centerOffset: Double?,
+        pointsPerMillimeter: Double?
+    ) -> TouchBarLayoutRuntimeState {
+        calibrationPreviewActive = active
+        calibrationPreviewOffset = active
+            ? min(300, max(-300, centerOffset ?? currentTouchBarLayoutState().centerOffset))
+            : nil
+        calibrationPreviewPointsPerMillimeter = active
+            ? min(
+                8,
+                max(
+                    2,
+                    pointsPerMillimeter
+                        ?? currentTouchBarLayoutState().pointsPerMillimeter
+                )
+            )
+            : nil
+        updateBasicViewLayout()
+        return currentTouchBarLayoutState()
+    }
+
+    private func updateBasicViewLayout() {
+        basicView?.update(layoutState: currentTouchBarLayoutState())
     }
 
     @objc func activeApplicationChanged(_: Notification) {
@@ -303,6 +365,7 @@ class TouchBarController: NSObject, NSTouchBarDelegate {
         guard touchBar != nil else { return }
         touchBar.delegate = self
         touchBar.defaultItemIdentifiers = [basicViewIdentifier]
+        touchBar.principalItemIdentifier = basicViewIdentifier
         updateActiveApp()
     }
 

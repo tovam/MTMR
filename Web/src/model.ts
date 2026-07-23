@@ -125,6 +125,67 @@ export function validateDocumentShape(value: unknown): Diagnostic[] {
     diagnostics.push({ severity: "error", message: "items doit être un tableau.", path: "$.items" });
     return diagnostics;
   }
+  if (value.touchBarLayout !== undefined) {
+    if (!isRecord(value.touchBarLayout)) {
+      diagnostics.push({
+        severity: "error",
+        message: "touchBarLayout doit être un objet.",
+        path: "$.touchBarLayout",
+      });
+    } else {
+      const layout = value.touchBarLayout;
+      if (layout.centerReference !== "touchBar" && layout.centerReference !== "chassis") {
+        diagnostics.push({
+          severity: "error",
+          message: "centerReference doit valoir touchBar ou chassis.",
+          path: "$.touchBarLayout.centerReference",
+        });
+      }
+      if (!isRecord(layout.calibrations)) {
+        diagnostics.push({
+          severity: "error",
+          message: "calibrations doit être un objet.",
+          path: "$.touchBarLayout.calibrations",
+        });
+      } else {
+        Object.entries(layout.calibrations).forEach(([profileName, profile]) => {
+          const profilePath = `$.touchBarLayout.calibrations.${profileName}`;
+          if (!isRecord(profile)) {
+            diagnostics.push({
+              severity: "error",
+              message: "Le profil de calibration doit être un objet.",
+              path: profilePath,
+            });
+            return;
+          }
+          if (
+            typeof profile.centerOffset !== "number"
+            || !Number.isFinite(profile.centerOffset)
+            || profile.centerOffset < -300
+            || profile.centerOffset > 300
+          ) {
+            diagnostics.push({
+              severity: "error",
+              message: "centerOffset doit être compris entre -300 et 300.",
+              path: `${profilePath}.centerOffset`,
+            });
+          }
+          if (
+            typeof profile.pointsPerMillimeter !== "number"
+            || !Number.isFinite(profile.pointsPerMillimeter)
+            || profile.pointsPerMillimeter < 2
+            || profile.pointsPerMillimeter > 8
+          ) {
+            diagnostics.push({
+              severity: "error",
+              message: "pointsPerMillimeter doit être compris entre 2 et 8.",
+              path: `${profilePath}.pointsPerMillimeter`,
+            });
+          }
+        });
+      }
+    }
+  }
   const ids = new Set<string>();
   const validateItems = (items: unknown[], itemsPath: string) => items.forEach((candidate, index) => {
     const path = `${itemsPath}[${index}]`;

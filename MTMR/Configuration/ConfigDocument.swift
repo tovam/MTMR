@@ -5,11 +5,18 @@ struct ConfigDocument: Codable, Equatable, Sendable {
 
     var formatVersion: Int
     var notes: String?
+    var touchBarLayout: TouchBarLayoutConfiguration?
     var items: [ConfigItem]
 
-    init(formatVersion: Int = ConfigDocument.currentFormatVersion, notes: String? = nil, items: [ConfigItem]) {
+    init(
+        formatVersion: Int = ConfigDocument.currentFormatVersion,
+        notes: String? = nil,
+        touchBarLayout: TouchBarLayoutConfiguration? = nil,
+        items: [ConfigItem]
+    ) {
         self.formatVersion = formatVersion
         self.notes = notes
+        self.touchBarLayout = touchBarLayout
         self.items = items
     }
 
@@ -54,6 +61,46 @@ struct ConfigDocument: Codable, Equatable, Sendable {
                 fingerprint: ConfigContentHasher.sha256(fingerprintData)
             )
         }
+    }
+}
+
+enum TouchBarCenterReference: String, Codable, Equatable, Sendable {
+    case touchBar
+    case chassis
+}
+
+struct TouchBarCalibrationProfile: Codable, Equatable, Sendable {
+    /// Standard Touch Bar panels are approximately 217 pixels per inch at 2x.
+    /// Keeping the physical scale explicit makes the 30 mm calibration guide
+    /// correctable per hardware profile without changing the layout algorithm.
+    static let defaultPointsPerMillimeter = 4.27
+
+    var centerOffset: Double
+    var pointsPerMillimeter: Double
+
+    init(
+        centerOffset: Double = 0,
+        pointsPerMillimeter: Double = TouchBarCalibrationProfile.defaultPointsPerMillimeter
+    ) {
+        self.centerOffset = centerOffset
+        self.pointsPerMillimeter = pointsPerMillimeter
+    }
+}
+
+struct TouchBarLayoutConfiguration: Codable, Equatable, Sendable {
+    var centerReference: TouchBarCenterReference
+    var calibrations: [String: TouchBarCalibrationProfile]
+
+    init(
+        centerReference: TouchBarCenterReference = .touchBar,
+        calibrations: [String: TouchBarCalibrationProfile] = [:]
+    ) {
+        self.centerReference = centerReference
+        self.calibrations = calibrations
+    }
+
+    func calibration(for hardwareModel: String) -> TouchBarCalibrationProfile? {
+        calibrations[hardwareModel] ?? calibrations["default"]
     }
 }
 

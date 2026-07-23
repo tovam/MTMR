@@ -65,7 +65,7 @@ struct ConfigValidator {
             return [error("config.rootType", "$", "Configuration root must be an object.")]
         }
 
-        let rootKeys = Set(["formatVersion", "notes", "items"])
+        let rootKeys = Set(["formatVersion", "notes", "touchBarLayout", "items"])
         for key in object.keys.sorted() where !rootKeys.contains(key) {
             diagnostics.append(error("config.unknownKey", path("$", key), "Unknown top-level property ‘\(key)’.") )
         }
@@ -86,6 +86,10 @@ struct ConfigValidator {
             diagnostics.append(typeError("$.notes", expected: "a string"))
         }
 
+        if let touchBarLayout = object["touchBarLayout"] {
+            validateTouchBarLayout(touchBarLayout, diagnostics: &diagnostics)
+        }
+
         guard case let .array(items)? = object["items"] else {
             diagnostics.append(error("config.items", "$.items", "items must be an array."))
             return diagnostics
@@ -94,6 +98,91 @@ struct ConfigValidator {
         var seenIDs = Set<String>()
         validate(items: items, path: "$.items", seenIDs: &seenIDs, diagnostics: &diagnostics)
         return diagnostics
+    }
+
+    private func validateTouchBarLayout(
+        _ value: JSONValue,
+        diagnostics: inout [ConfigurationDiagnostic]
+    ) {
+        let layoutPath = "$.touchBarLayout"
+        guard case let .object(layout) = value else {
+            diagnostics.append(typeError(layoutPath, expected: "an object"))
+            return
+        }
+
+        let allowedLayoutKeys = Set(["centerReference", "calibrations"])
+        for key in layout.keys.sorted() where !allowedLayoutKeys.contains(key) {
+            diagnostics.append(error(
+                "config.unknownKey",
+                path(layoutPath, key),
+                "Unknown Touch Bar layout property ‘\(key)’."
+            ))
+        }
+
+        if case let .string(reference)? = layout["centerReference"] {
+            if TouchBarCenterReference(rawValue: reference) == nil {
+                diagnostics.append(error(
+                    "config.enum",
+                    "\(layoutPath).centerReference",
+                    "centerReference must be ‘touchBar’ or ‘chassis’."
+                ))
+            }
+        } else {
+            diagnostics.append(typeError("\(layoutPath).centerReference", expected: "a string"))
+        }
+
+        guard case let .object(calibrations)? = layout["calibrations"] else {
+            diagnostics.append(typeError("\(layoutPath).calibrations", expected: "an object"))
+            return
+        }
+
+        for profileName in calibrations.keys.sorted() {
+            let profilePath = "\(layoutPath).calibrations.\(profileName)"
+            if profileName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                diagnostics.append(error(
+                    "config.calibrationProfile",
+                    "\(layoutPath).calibrations",
+                    "Calibration profile names must not be empty."
+                ))
+            }
+            guard case let .object(profile) = calibrations[profileName] else {
+                diagnostics.append(typeError(profilePath, expected: "an object"))
+                continue
+            }
+
+            let allowedProfileKeys = Set(["centerOffset", "pointsPerMillimeter"])
+            for key in profile.keys.sorted() where !allowedProfileKeys.contains(key) {
+                diagnostics.append(error(
+                    "config.unknownKey",
+                    path(profilePath, key),
+                    "Unknown calibration property ‘\(key)’."
+                ))
+            }
+
+            if let offset = profile["centerOffset"]?.numberValue {
+                if offset < -300 || offset > 300 {
+                    diagnostics.append(error(
+                        "config.range",
+                        "\(profilePath).centerOffset",
+                        "centerOffset must be from -300 through 300 points."
+                    ))
+                }
+            } else {
+                diagnostics.append(typeError("\(profilePath).centerOffset", expected: "a number"))
+            }
+
+            if let scale = profile["pointsPerMillimeter"]?.numberValue {
+                if scale < 2 || scale > 8 {
+                    diagnostics.append(error(
+                        "config.range",
+                        "\(profilePath).pointsPerMillimeter",
+                        "pointsPerMillimeter must be from 2 through 8."
+                    ))
+                }
+            } else {
+                diagnostics.append(typeError("\(profilePath).pointsPerMillimeter", expected: "a number"))
+            }
+        }
     }
 
     private func validate(

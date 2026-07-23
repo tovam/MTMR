@@ -113,6 +113,12 @@ export function App() {
     editor.commitDocument(updateItem(editor.document, item), "item.changed");
   };
 
+  const saveDocument = async (document: typeof editor.document) => {
+    if (editor.formLocked) return;
+    editor.commitDocument(document, "touchbar.calibration.saved");
+    await editor.save();
+  };
+
   const duplicateSelected = () => {
     if (!editor.selectedItem || editor.formLocked) return;
     const result = duplicateItem(editor.document, editor.selectedItem.id);
@@ -196,18 +202,21 @@ export function App() {
             simulation={editor.simulation}
             simulationDirect={editor.simulationDirect}
             simulationResult={editor.simulationResult}
+            runtimeSnapshot={editor.runtimeSnapshot}
             selectedItem={editor.selectedItem}
             saveState={editor.saveState}
             editingLocked={editor.formLocked}
             onTab={setTab}
             onSource={editor.setRawSource}
             onDocument={(document) => editor.commitDocument(document, "document.changed")}
+            onSaveDocument={saveDocument}
             onSelectItem={selectFromList}
             onMoveTreeItem={moveFromOrder}
             onSimulation={editor.updateSimulation}
             onBeginSimulation={editor.beginSimulation}
             onResetSimulation={editor.resetSimulation}
             onSimulateAction={editor.simulateAction}
+            onTouchBarCalibration={editor.updateTouchBarCalibration}
           />
         </div>
 

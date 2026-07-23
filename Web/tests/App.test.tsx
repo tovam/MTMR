@@ -133,6 +133,24 @@ describe("éditeur MMTMR", () => {
       }
       if (url.endsWith("/preview/context")) return jsonResponse({ context: JSON.parse(String(init?.body)) });
       if (url.endsWith("/preview/action")) return jsonResponse({ executed: false, description: "La lettre ž serait saisie." });
+      if (url.endsWith("/touchbar/calibration")) {
+        const request = JSON.parse(String(init?.body)) as {
+          active: boolean;
+          centerOffset?: number;
+          pointsPerMillimeter?: number;
+        };
+        return jsonResponse({
+          state: {
+            active: request.active,
+            hardwareModel: "MacBookPro16,1",
+            centerReference: request.active ? "chassis" : "touchBar",
+            centerOffset: request.centerOffset ?? 0,
+            pointsPerMillimeter: request.pointsPerMillimeter ?? 4.27,
+            guideWidthMillimeters: 30,
+            calibrated: false,
+          },
+        });
+      }
       if (url.endsWith("/config") && init?.method === "PUT") {
         const source = JSON.parse(String(init.body)).source as string;
         return jsonResponse({ source, document: JSON.parse(source), revision: 5, diagnostics: [], valid: true });
@@ -158,6 +176,55 @@ describe("éditeur MMTMR", () => {
     render(<App />);
     await screen.findByRole("button", { name: "Bonjour" });
     expect(String(vi.mocked(fetch).mock.calls[0][0])).toMatch(/\/api\/v1\/session$/);
+  });
+
+  it("affiche sur les deux aperçus le repère physique de 3 cm et enregistre le profil du Mac", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByRole("button", { name: "Bonjour" });
+    await waitFor(() => expect(MockWebSocket.instances).toHaveLength(1));
+    MockWebSocket.instances[0].sendEvent({
+      type: "runtime.snapshot",
+      timestamp: "2026-07-23T12:00:00Z",
+      payload: {
+        items: [],
+        touchBarLayout: {
+          active: false,
+          hardwareModel: "MacBookPro16,1",
+          centerReference: "touchBar",
+          centerOffset: 0,
+          pointsPerMillimeter: 4.27,
+          guideWidthMillimeters: 30,
+          calibrated: false,
+        },
+      },
+    });
+
+    await user.click(await screen.findByRole("button", { name: "Calibrer ce Mac" }));
+    expect(await screen.findByText("Repère physique : 30 mm")).toBeInTheDocument();
+    expect(await screen.findByTestId("touchbar-calibration-guide")).toHaveStyle({
+      width: "128.1px",
+    });
+
+    await user.click(screen.getByRole("button", { name: "+1" }));
+    await user.click(screen.getByRole("button", { name: "Enregistrer ce centre" }));
+
+    await waitFor(() => {
+      const put = vi.mocked(fetch).mock.calls.find(([, init]) => init?.method === "PUT");
+      expect(put).toBeDefined();
+      const source = JSON.parse(String(put?.[1]?.body)).source as string;
+      const saved = JSON.parse(source);
+      expect(saved.touchBarLayout).toEqual({
+        centerReference: "chassis",
+        calibrations: {
+          "MacBookPro16,1": {
+            centerOffset: 1,
+            pointsPerMillimeter: 4.27,
+          },
+        },
+      });
+    });
+    await waitFor(() => expect(screen.queryByTestId("touchbar-calibration-guide")).not.toBeInTheDocument());
   });
 
   it("sélectionne un élément et expose son action Unicode dans l’inspecteur", async () => {

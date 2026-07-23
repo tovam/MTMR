@@ -252,6 +252,46 @@ struct EditorServerController: Sendable {
             }
         }
 
+        router.post("/api/v1/touchbar/calibration") { request, _ in
+            guard security.allowsAPIRequest(request, requiresOrigin: true) else {
+                return forbiddenResponse()
+            }
+            guard await mutationRateLimiter.allowRequest() else {
+                return rateLimitedResponse()
+            }
+            guard acceptsJSON(request) else {
+                return unsupportedMediaTypeResponse()
+            }
+            do {
+                let calibration: ServerTouchBarCalibrationRequest = try await decodeBody(
+                    request,
+                    as: ServerTouchBarCalibrationRequest.self
+                )
+                if let offset = calibration.centerOffset,
+                   !offset.isFinite || offset < -300 || offset > 300 {
+                    return jsonErrorResponse(
+                        status: .unprocessableContent,
+                        code: "invalid_center_offset",
+                        message: "centerOffset must be from -300 through 300 points."
+                    )
+                }
+                if let scale = calibration.pointsPerMillimeter,
+                   !scale.isFinite || scale < 2 || scale > 8 {
+                    return jsonErrorResponse(
+                        status: .unprocessableContent,
+                        code: "invalid_physical_scale",
+                        message: "pointsPerMillimeter must be from 2 through 8."
+                    )
+                }
+                let state = try await provider.updateTouchBarCalibration(calibration)
+                return jsonResponse(TouchBarCalibrationEnvelope(state: state))
+            } catch let error as EditorRequestBodyError {
+                return bodyErrorResponse(error)
+            } catch {
+                return await providerFailureResponse(error)
+            }
+        }
+
         return router
     }
 
@@ -576,6 +616,10 @@ private struct PreviewActionEnvelope: Encodable {
     let executed: Bool
     let description: String
     let event: ServerEvent
+}
+
+private struct TouchBarCalibrationEnvelope: Encodable {
+    let state: ServerTouchBarCalibrationState
 }
 
 private struct ErrorDescription: Codable {

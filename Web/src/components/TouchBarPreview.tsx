@@ -1,7 +1,11 @@
 import { Fragment } from "preact";
 import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
 import { createItem, itemLabel, itemPresentation } from "../model";
-import { computeTouchBarZoneFrames, type TouchBarZoneFrames } from "../touchBarLayout";
+import {
+  computeTouchBarZoneFrames,
+  TOUCH_BAR_GROUP_SPACING,
+  type TouchBarZoneFrames,
+} from "../touchBarLayout";
 import type {
   Alignment,
   ConfigDocument,
@@ -10,6 +14,7 @@ import type {
   JsonSchema,
   RuntimeItemGeometry,
   SimulationContext,
+  TouchBarCalibrationState,
 } from "../types";
 import { clearDragPayload, getDragPayload, setDragPayload } from "./Palette";
 import { ItemTypeIcon } from "./MediaControlIcon";
@@ -41,6 +46,22 @@ interface ZoneOverflow {
 }
 
 const DEFAULT_DROP_PREVIEW_WIDTH = 64;
+
+function runtimeTouchBarLayout(snapshot?: JsonObject): TouchBarCalibrationState | undefined {
+  const candidate = snapshot?.touchBarLayout;
+  if (!candidate || typeof candidate !== "object" || Array.isArray(candidate)) return undefined;
+  const state = candidate as JsonObject;
+  if (
+    typeof state.active !== "boolean"
+    || typeof state.hardwareModel !== "string"
+    || (state.centerReference !== "touchBar" && state.centerReference !== "chassis")
+    || typeof state.centerOffset !== "number"
+    || typeof state.pointsPerMillimeter !== "number"
+    || typeof state.guideWidthMillimeters !== "number"
+    || typeof state.calibrated !== "boolean"
+  ) return undefined;
+  return state as TouchBarCalibrationState;
+}
 
 function insertionTarget(
   zone: HTMLDivElement,
@@ -260,6 +281,20 @@ export function TouchBarPreview(props: TouchBarPreviewProps) {
     setDropTarget(target);
   };
   const snapshotContext = props.runtimeSnapshot?.context;
+  const runtimeLayout = runtimeTouchBarLayout(props.runtimeSnapshot);
+  const storedLayout = props.document.touchBarLayout;
+  const storedProfile = storedLayout?.calibrations?.[runtimeLayout?.hardwareModel ?? ""]
+    ?? storedLayout?.calibrations?.default;
+  const centerReference = runtimeLayout?.centerReference ?? storedLayout?.centerReference ?? "touchBar";
+  const centerOffset = centerReference === "chassis"
+    ? runtimeLayout?.centerOffset ?? storedProfile?.centerOffset ?? 0
+    : 0;
+  const pointsPerMillimeter = runtimeLayout?.pointsPerMillimeter
+    ?? storedProfile?.pointsPerMillimeter
+    ?? 4.27;
+  const calibrationGuideWidth = (
+    runtimeLayout?.guideWidthMillimeters ?? 30
+  ) * pointsPerMillimeter;
   const runtimeInputAccess = snapshotContext && typeof snapshotContext === "object" && !Array.isArray(snapshotContext)
     && typeof snapshotContext.inputAccess === "boolean"
     ? snapshotContext.inputAccess
@@ -347,7 +382,7 @@ export function TouchBarPreview(props: TouchBarPreviewProps) {
         left: naturalWidth("left"),
         center: naturalWidth("center"),
         right: naturalWidth("right"),
-      });
+      }, TOUCH_BAR_GROUP_SPACING, trackWidth / 2 + centerOffset);
       setZoneFrames((current) => {
         const unchanged = current && (["left", "center", "right"] as Alignment[]).every((align) => (
           Math.abs(current[align].x - next[align].x) < 0.25
@@ -364,7 +399,7 @@ export function TouchBarPreview(props: TouchBarPreviewProps) {
       if (zone) observer?.observe(zone);
     });
     return () => observer?.disconnect();
-  }, [props.document, props.runtimeSnapshot, dropTarget, scale]);
+  }, [props.document, props.runtimeSnapshot, dropTarget, scale, centerOffset]);
 
   const refreshZoneOverflow = () => {
     const next = {} as Record<Alignment, ZoneOverflow>;
@@ -477,7 +512,27 @@ export function TouchBarPreview(props: TouchBarPreviewProps) {
       <div class="preview-scroll" data-testid="preview-scroll" data-fit-scale={scale.toFixed(3)}>
         <div class="touchbar-frame">
           <div class="touchbar-fit" ref={fitRef}>
-            <div class="touchbar-track" ref={trackRef} style={{ transform: `scale(${scale})` }}>
+            <div
+              class="touchbar-track"
+              ref={trackRef}
+              style={{ transform: `scale(${scale})` }}
+              data-center-offset={centerOffset.toFixed(1)}
+            >
+              {runtimeLayout?.active && (
+                <div
+                  class="touchbar-calibration-guide"
+                  data-testid="touchbar-calibration-guide"
+                  style={{
+                    left: `calc(50% + ${centerOffset}px)`,
+                    width: `${calibrationGuideWidth}px`,
+                  }}
+                  aria-hidden="true"
+                >
+                  <i class="touchbar-calibration-edge touchbar-calibration-edge-left" />
+                  <i class="touchbar-calibration-center" />
+                  <i class="touchbar-calibration-edge touchbar-calibration-edge-right" />
+                </div>
+              )}
               {(["left", "center", "right"] as Alignment[]).map((align) => {
                 const zoneItems = byAlignment(align);
                 const active = dropTarget?.align === align;

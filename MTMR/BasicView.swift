@@ -244,10 +244,94 @@ private final class TouchBarZoneScrollView: NSScrollView {
     }
 }
 
+private final class TouchBarCalibrationOverlayView: NSView {
+    private var centerX: CGFloat = 0
+    private var pointsPerMillimeter: CGFloat = CGFloat(
+        TouchBarCalibrationProfile.defaultPointsPerMillimeter
+    )
+
+    override var isOpaque: Bool { false }
+
+    func update(active: Bool, centerX: CGFloat, pointsPerMillimeter: CGFloat) {
+        isHidden = !active
+        self.centerX = centerX
+        self.pointsPerMillimeter = max(2, min(8, pointsPerMillimeter))
+        setAccessibilityElement(active)
+        if active {
+            setAccessibilityLabel("Repère de calibration du centre physique")
+            setAccessibilityValue("Zone de 30 millimètres centrée sur une ligne d’un pixel")
+        }
+        needsDisplay = true
+    }
+
+    override func hitTest(_ point: NSPoint) -> NSView? {
+        isHidden ? nil : (bounds.contains(point) ? self : nil)
+    }
+
+    override func draw(_ dirtyRect: NSRect) {
+        super.draw(dirtyRect)
+        guard !isHidden, let context = NSGraphicsContext.current else { return }
+
+        context.saveGraphicsState()
+        defer { context.restoreGraphicsState() }
+        context.shouldAntialias = false
+
+        let backingScale = max(
+            1,
+            window?.backingScaleFactor ?? NSScreen.main?.backingScaleFactor ?? 2
+        )
+        let physicalPixel = 1 / backingScale
+        let alignedCenterX = (centerX * backingScale).rounded() / backingScale
+        let guideWidth = CGFloat(
+            TouchBarLayoutRuntimeState.calibrationGuideWidthMillimeters
+        ) * pointsPerMillimeter
+        let guideRect = NSRect(
+            x: alignedCenterX - guideWidth / 2,
+            y: bounds.minY,
+            width: guideWidth,
+            height: bounds.height
+        ).intersection(bounds)
+
+        NSColor.systemRed.withAlphaComponent(0.16).setFill()
+        guideRect.fill()
+
+        NSColor.systemRed.withAlphaComponent(0.78).setFill()
+        NSRect(
+            x: alignedCenterX - guideWidth / 2 - physicalPixel / 2,
+            y: bounds.minY,
+            width: physicalPixel,
+            height: bounds.height
+        ).intersection(bounds).fill()
+        NSRect(
+            x: alignedCenterX + guideWidth / 2 - physicalPixel / 2,
+            y: bounds.minY,
+            width: physicalPixel,
+            height: bounds.height
+        ).intersection(bounds).fill()
+
+        NSColor.systemRed.setFill()
+        NSRect(
+            x: alignedCenterX - physicalPixel / 2,
+            y: bounds.minY,
+            width: physicalPixel,
+            height: bounds.height
+        ).intersection(bounds).fill()
+    }
+}
+
 private final class TouchBarZonesView: NSView {
     private let leftZone = TouchBarZoneScrollView(anchor: .leading)
     private let centerZone = TouchBarZoneScrollView(anchor: .center)
     private let rightZone = TouchBarZoneScrollView(anchor: .trailing)
+    private let calibrationOverlay = TouchBarCalibrationOverlayView()
+    private var layoutState = TouchBarLayoutRuntimeState(
+        hardwareModel: TouchBarHardwareProfile.current.modelIdentifier,
+        centerReference: .touchBar,
+        centerOffset: 0,
+        pointsPerMillimeter: TouchBarCalibrationProfile.defaultPointsPerMillimeter,
+        calibrated: false,
+        calibrationActive: false
+    )
 
     override var intrinsicContentSize: NSSize {
         NSSize(
@@ -263,6 +347,7 @@ private final class TouchBarZonesView: NSView {
         [leftZone, centerZone, rightZone].forEach { zone in
             addSubview(zone)
         }
+        addSubview(calibrationOverlay)
         NotificationCenter.default.addObserver(
             self,
             selector: #selector(contentSizeDidChange(_:)),
@@ -301,17 +386,28 @@ private final class TouchBarZonesView: NSView {
     override func layout() {
         super.layout()
         let actualBounds = TouchBarPhysicalLayout.visibleBounds(bounds: bounds, visibleRect: visibleRect)
+        let chassisCenterX = bounds.midX + CGFloat(layoutState.centerOffset)
+        let layoutCenterX = layoutState.centerReference == .chassis
+            ? chassisCenterX
+            : actualBounds.midX
         let frames = TouchBarPhysicalLayout.frames(
             in: actualBounds,
             naturalWidths: TouchBarZoneWidths(
                 left: leftZone.naturalWidth,
                 center: centerZone.naturalWidth,
                 right: rightZone.naturalWidth
-            )
+            ),
+            centerX: layoutCenterX
         )
         apply(frame: frames.left, to: leftZone)
         apply(frame: frames.center, to: centerZone)
         apply(frame: frames.right, to: rightZone)
+        calibrationOverlay.frame = bounds
+        calibrationOverlay.update(
+            active: layoutState.calibrationActive,
+            centerX: chassisCenterX,
+            pointsPerMillimeter: CGFloat(layoutState.pointsPerMillimeter)
+        )
     }
 
     func update(left: [NSView], center: [NSView], right: [NSView]) {
@@ -324,6 +420,12 @@ private final class TouchBarZonesView: NSView {
         leftZone.update(views: left)
         centerZone.update(views: center)
         rightZone.update(views: right)
+        needsLayout = true
+        layoutSubtreeIfNeeded()
+    }
+
+    func update(layoutState: TouchBarLayoutRuntimeState) {
+        self.layoutState = layoutState
         needsLayout = true
         layoutSubtreeIfNeeded()
     }
@@ -398,6 +500,10 @@ class BasicView: NSCustomTouchBarItem, NSGestureRecognizerDelegate {
             center: centerItems.compactMap(\.view),
             right: rightItems.compactMap(\.view)
         )
+    }
+
+    func update(layoutState: TouchBarLayoutRuntimeState) {
+        zonesView.update(layoutState: layoutState)
     }
 
     required init?(coder _: NSCoder) {

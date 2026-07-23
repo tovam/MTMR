@@ -1,5 +1,6 @@
 import Foundation
 import CoreGraphics
+import Darwin
 
 public enum InputDispatchAction: String, Sendable {
     case unicodeText
@@ -100,6 +101,37 @@ struct TouchBarZoneFrames: Equatable, Sendable {
     let right: CGRect
 }
 
+struct TouchBarHardwareProfile: Equatable, Sendable {
+    static let current = TouchBarHardwareProfile(
+        modelIdentifier: readModelIdentifier()
+    )
+
+    let modelIdentifier: String
+
+    private static func readModelIdentifier() -> String {
+        var size = 0
+        guard sysctlbyname("hw.model", nil, &size, nil, 0) == 0, size > 1 else {
+            return "unknown"
+        }
+        var buffer = [CChar](repeating: 0, count: size)
+        guard sysctlbyname("hw.model", &buffer, &size, nil, 0) == 0 else {
+            return "unknown"
+        }
+        return String(cString: buffer)
+    }
+}
+
+struct TouchBarLayoutRuntimeState: Equatable, Sendable {
+    static let calibrationGuideWidthMillimeters = 30.0
+
+    let hardwareModel: String
+    let centerReference: TouchBarCenterReference
+    let centerOffset: Double
+    let pointsPerMillimeter: Double
+    let calibrated: Bool
+    let calibrationActive: Bool
+}
+
 /// Positions the three logical groups in one full-width coordinate space.
 /// Left and right grow inwards from the actual visible edges; center always
 /// stays on the physical midpoint. A frame narrower than its natural width is
@@ -125,7 +157,8 @@ struct TouchBarPhysicalLayout: Sendable {
     static func frames(
         in containerRect: CGRect,
         naturalWidths: TouchBarZoneWidths,
-        spacing: CGFloat = groupSpacing
+        spacing: CGFloat = groupSpacing,
+        centerX requestedCenterX: CGFloat? = nil
     ) -> TouchBarZoneFrames {
         let rect = CGRect(
             x: containerRect.minX,
@@ -141,11 +174,12 @@ struct TouchBarPhysicalLayout: Sendable {
         guard rect.width > 0 else {
             return TouchBarZoneFrames(left: .zero, center: .zero, right: .zero)
         }
+        let centerX = min(rect.maxX, max(rect.minX, requestedCenterX ?? rect.midX))
 
         if centerNatural > 0 {
             let centerWidth = min(centerNatural, rect.width)
             let center = CGRect(
-                x: rect.midX - centerWidth / 2,
+                x: min(rect.maxX - centerWidth, max(rect.minX, centerX - centerWidth / 2)),
                 y: rect.minY,
                 width: centerWidth,
                 height: rect.height
@@ -175,7 +209,7 @@ struct TouchBarPhysicalLayout: Sendable {
 
         return TouchBarZoneFrames(
             left: CGRect(x: rect.minX, y: rect.minY, width: allocated.left, height: rect.height),
-            center: CGRect(x: rect.midX, y: rect.minY, width: 0, height: rect.height),
+            center: CGRect(x: centerX, y: rect.minY, width: 0, height: rect.height),
             right: CGRect(x: rect.maxX - allocated.right, y: rect.minY, width: allocated.right, height: rect.height)
         )
     }

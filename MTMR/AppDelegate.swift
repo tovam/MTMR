@@ -285,6 +285,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 if !applied {
                     throw RuntimeConfigurationApplyError("The validated configuration could not be applied to AppKit.")
                 }
+            },
+            touchBarCalibrationHandler: { [weak self] request in
+                await MainActor.run {
+                    let state = TouchBarController.shared.updateCalibrationPreview(
+                        active: request.active,
+                        centerOffset: request.centerOffset,
+                        pointsPerMillimeter: request.pointsPerMillimeter
+                    )
+                    self?.publishRuntimeSnapshot(force: true)
+                    return ServerTouchBarCalibrationState(
+                        active: state.calibrationActive,
+                        hardwareModel: state.hardwareModel,
+                        centerReference: state.centerReference.rawValue,
+                        centerOffset: state.centerOffset,
+                        pointsPerMillimeter: state.pointsPerMillimeter,
+                        guideWidthMillimeters:
+                            TouchBarLayoutRuntimeState.calibrationGuideWidthMillimeters,
+                        calibrated: state.calibrated
+                    )
+                }
             }
         )
     }
@@ -358,7 +378,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     return false
                 }
             }
-            TouchBarController.shared.apply(runtimeItems: runtimeItems)
+            TouchBarController.shared.apply(
+                runtimeItems: runtimeItems,
+                layoutConfiguration: document.touchBarLayout
+            )
             lastRuntimeError = nil
             DispatchQueue.main.async { [weak self] in
                 self?.publishRuntimeSnapshot(revision: snapshot.revision, force: true)
@@ -642,9 +665,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             "theme": .string(theme),
             "time": .string(runtimeContextTimeFormatter.string(from: Date())),
         ])
+        let touchBarLayoutState = TouchBarController.shared.currentTouchBarLayoutState()
+        let touchBarLayout: ServerJSONValue = .object([
+            "active": .bool(touchBarLayoutState.calibrationActive),
+            "calibrated": .bool(touchBarLayoutState.calibrated),
+            "centerOffset": .number(touchBarLayoutState.centerOffset),
+            "centerReference": .string(touchBarLayoutState.centerReference.rawValue),
+            "guideWidthMillimeters": .number(
+                TouchBarLayoutRuntimeState.calibrationGuideWidthMillimeters
+            ),
+            "hardwareModel": .string(touchBarLayoutState.hardwareModel),
+            "pointsPerMillimeter": .number(touchBarLayoutState.pointsPerMillimeter),
+        ])
         let completePayload: ServerJSONValue = .object([
             "items": .array(completeGeometry),
             "context": context,
+            "touchBarLayout": touchBarLayout,
         ])
         let eventRevision = revision ?? coordinator?.snapshot().revision
         let encoder = JSONEncoder()
@@ -668,6 +704,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             payload: force ? completePayload : .object([
                 "items": .array(deltaGeometry),
                 "context": context,
+                "touchBarLayout": touchBarLayout,
             ]),
             timestamp: timestamp
         )
