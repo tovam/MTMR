@@ -62,6 +62,23 @@ public enum MMTMRInputDispatchNotification {
     public static let resultUserInfoKey = "result"
 }
 
+/// Resolves the text emitted by a `typeText` action at touch time. Shift and
+/// Caps Lock follow normal keyboard capitalization semantics: either modifier
+/// selects the alternate text, while both together cancel each other.
+struct ModifierAwareTextSelector: Sendable {
+    static func text(
+        regularText: String,
+        shiftText: String?,
+        fallbackShiftText: String? = nil,
+        flags: CGEventFlags
+    ) -> String {
+        guard let alternateText = shiftText ?? fallbackShiftText else { return regularText }
+        let shiftPressed = flags.contains(.maskShift)
+        let capsLockEnabled = flags.contains(.maskAlphaShift)
+        return shiftPressed != capsLockEnabled ? alternateText : regularText
+    }
+}
+
 /// Pure state used by the physical Touch Bar gesture recognizers. Once a long
 /// press has fired, the release that ends that same touch must not also count as
 /// a single tap.

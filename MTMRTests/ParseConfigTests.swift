@@ -33,14 +33,32 @@ class ParseConfig: XCTestCase {
 
     func testButtonUnicodeTextAction() {
         let buttonFixture = """
-            [  { "type": "staticButton", "title": "Unicode", "actions": [ { "trigger": "singleTap", "action": "typeText", "text": "ž👍" } ] } ]
+            [  { "type": "staticButton", "title": "Unicode", "actions": [ { "trigger": "singleTap", "action": "typeText", "text": "ž👍", "shiftText": "Ž👍" } ] } ]
         """.data(using: .utf8)!
         let result = try? JSONDecoder().decode([BarItemDefinition].self, from: buttonFixture)
 
-        guard case .typeText(text: "ž👍")? = result?.first?.actions.first?.value else {
+        guard case let .typeText(text, shiftText)? = result?.first?.actions.first?.value else {
             XCTFail()
             return
         }
+        XCTAssertEqual(text, "ž👍")
+        XCTAssertEqual(shiftText, "Ž👍")
+    }
+
+    func testLongTapUnicodeTextIsAvailableAsModifierFallback() throws {
+        let fixture = """
+            [{
+              "type": "staticButton",
+              "title": "ž",
+              "actions": [
+                { "trigger": "singleTap", "action": "typeText", "text": "ž" },
+                { "trigger": "longTap", "action": "typeText", "text": "Ž" }
+              ]
+            }]
+        """.data(using: .utf8)!
+
+        let result = try JSONDecoder().decode([BarItemDefinition].self, from: fixture)
+        XCTAssertEqual(result.first?.actions.longTapTypeText, "Ž")
     }
     
     func testButtonKeyCodeLegacyAction() {

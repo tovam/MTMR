@@ -40,13 +40,9 @@ Exemple avec injection Unicode native immédiate :
       "actions": [
         {
           "action": "typeText",
+          "shiftText": "Ž",
           "text": "ž",
           "trigger": "singleTap"
-        },
-        {
-          "action": "typeText",
-          "text": "Ž",
-          "trigger": "longTap"
         }
       ],
       "align": "left",
@@ -62,6 +58,14 @@ Exemple avec injection Unicode native immédiate :
 ```
 
 `typeText` envoie directement les unités UTF-16 avec `CGEvent`. Il n’utilise ni AppleScript, ni le presse-papiers, ni un collage Commande-V.
+
+`shiftText` est facultatif. Au moment du toucher, MMTMR utilise cette variante
+si Shift ou Verr. Maj. est actif. Si Shift et Verr. Maj. sont actifs ensemble,
+ils s’annulent comme sur un clavier classique et `text` est utilisé. Le test
+des modificateurs est immédiat et ne passe par aucun script. Pour les boutons
+existants qui ont déjà un `typeText` en `longTap`, ce texte long est utilisé
+automatiquement comme variante : il n’est pas nécessaire de réécrire la
+configuration actuelle.
 
 Au démarrage, MMTMR demande une seule fois l’autorisation macOS nécessaire aux frappes et aux touches système. Elle doit être accordée dans **Réglages Système > Confidentialité et sécurité > Accessibilité** pour que `typeText`, le volume et la luminosité fonctionnent depuis la Touch Bar physique. L’application effectue cette demande avant le premier appui afin d’éviter le délai initial. Le menu MMTMR affiche l’état de l’autorisation et permet de rouvrir le bon panneau de réglages.
 

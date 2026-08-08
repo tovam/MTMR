@@ -2,6 +2,66 @@ import AppKit
 import XCTest
 
 final class InputDispatchTests: XCTestCase {
+    func testModifierAwareTextUsesNormalShiftAndCapsLockSemantics() {
+        let regular = "ž"
+        let alternate = "Ž"
+
+        XCTAssertEqual(
+            ModifierAwareTextSelector.text(regularText: regular, shiftText: alternate, flags: []),
+            regular
+        )
+        XCTAssertEqual(
+            ModifierAwareTextSelector.text(
+                regularText: regular,
+                shiftText: alternate,
+                flags: [.maskShift]
+            ),
+            alternate
+        )
+        XCTAssertEqual(
+            ModifierAwareTextSelector.text(
+                regularText: regular,
+                shiftText: alternate,
+                flags: [.maskAlphaShift]
+            ),
+            alternate
+        )
+        XCTAssertEqual(
+            ModifierAwareTextSelector.text(
+                regularText: regular,
+                shiftText: alternate,
+                flags: [.maskShift, .maskAlphaShift]
+            ),
+            regular
+        )
+        XCTAssertEqual(
+            ModifierAwareTextSelector.text(
+                regularText: regular,
+                shiftText: nil,
+                fallbackShiftText: alternate,
+                flags: [.maskShift]
+            ),
+            alternate
+        )
+        XCTAssertEqual(
+            ModifierAwareTextSelector.text(
+                regularText: regular,
+                shiftText: "EXP",
+                fallbackShiftText: alternate,
+                flags: [.maskShift]
+            ),
+            "EXP"
+        )
+        XCTAssertEqual(
+            ModifierAwareTextSelector.text(
+                regularText: regular,
+                shiftText: nil,
+                flags: [.maskShift]
+            ),
+            regular
+        )
+    }
+
     func testPhysicalTouchBarAlignmentUsesNaturalEdgeWidthsAndAnExactCenter() {
         let frames = TouchBarPhysicalLayout.frames(
             in: CGRect(x: 0, y: 0, width: 1_000, height: 30),

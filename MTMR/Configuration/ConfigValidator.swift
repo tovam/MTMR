@@ -557,9 +557,12 @@ struct ConfigValidator {
                     diagnostics.append(error("config.actionKeycode", "\(actionPath).keycode", "keyPress keycode must be an integer from 0 through 65535."))
                 }
             case "typeText":
-                allowed.insert("text")
+                allowed.formUnion(["text", "shiftText"])
                 if action["text"]?.stringValue == nil {
                     diagnostics.append(typeError("\(actionPath).text", expected: "a string"))
+                }
+                if let shiftText = action["shiftText"], shiftText.stringValue == nil {
+                    diagnostics.append(typeError("\(actionPath).shiftText", expected: "a string"))
                 }
             case "appleScript":
                 allowed.insert("actionAppleScript")

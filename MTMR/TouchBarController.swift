@@ -820,8 +820,17 @@ class TouchBarController: NSObject, NSTouchBarDelegate {
         }
         
         if let touchBarItem = barItem as? CustomButtonTouchBarItem {
+            let longTapTextFallback = item.actions.longTapTypeText
             for action in item.actions {
-                touchBarItem.actions.append(ItemAction(trigger: action.trigger, self.closure(for: action)))
+                touchBarItem.actions.append(ItemAction(
+                    trigger: action.trigger,
+                    self.closure(
+                        for: action,
+                        fallbackShiftText: action.trigger == .singleTap
+                            ? longTapTextFallback
+                            : nil
+                    )
+                ))
             }
         }
         if case let .bordered(bordered)? = item.additionalParameters[.bordered], let item = barItem as? CustomButtonTouchBarItem {
@@ -846,14 +855,23 @@ class TouchBarController: NSObject, NSTouchBarDelegate {
         return barItem
     }
     
-    func closure(for action: Action) -> (() -> Void)? {
+    func closure(for action: Action, fallbackShiftText: String? = nil) -> (() -> Void)? {
         switch action.value {
         case let .hidKey(keycode: keycode):
             return { HIDPostAuxKey(keycode) }
         case let .keyPress(keycode: keycode):
             return { GenericKeyPress(keyCode: CGKeyCode(keycode)).send() }
-        case let .typeText(text: text):
-            return { UnicodeTextInput(text: text).send() }
+        case let .typeText(text: text, shiftText: shiftText):
+            return {
+                let flags = CGEventSource.flagsState(.combinedSessionState)
+                let selectedText = ModifierAwareTextSelector.text(
+                    regularText: text,
+                    shiftText: shiftText,
+                    fallbackShiftText: fallbackShiftText,
+                    flags: flags
+                )
+                UnicodeTextInput(text: selectedText).send()
+            }
         case let .appleScript(source: source):
             guard let appleScript = source.appleScript else {
                 print("cannot create apple script for item \(action)")

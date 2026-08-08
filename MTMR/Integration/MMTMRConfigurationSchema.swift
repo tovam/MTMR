@@ -77,6 +77,9 @@ enum MMTMRConfigurationSchema {
         "oneOf": .array([
             actionVariant("typeText", title: "Type Unicode text", fields: [
                 "text": stringProperty("Text injected with a native CGEvent."),
+                "shiftText": stringProperty(
+                    "Alternate text used when Shift or Caps Lock is active. If omitted, a long-tap typeText action is reused. Shift and Caps Lock together cancel each other."
+                ),
             ], required: ["text"]),
             actionVariant("keyPress", title: "Key press", fields: [
                 "keycode": integerProperty(minimum: 0, maximum: Double(UInt16.max)),

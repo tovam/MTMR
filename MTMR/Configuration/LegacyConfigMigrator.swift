@@ -168,6 +168,9 @@ struct LegacyConfigMigrator {
             if let value = item[long ? "longKeycode" : "keycode"] { result["keycode"] = value }
         case "typeText":
             if let value = item[long ? "longText" : "text"] { result["text"] = value }
+            if let value = item[long ? "longShiftText" : "shiftText"] {
+                result["shiftText"] = value
+            }
         case "appleScript":
             if let value = item[long ? "longActionAppleScript" : "actionAppleScript"] {
                 result["actionAppleScript"] = value
@@ -198,8 +201,8 @@ struct LegacyConfigMigrator {
     }
 
     private static let legacyActionKeys: Set<String> = [
-        "action", "keycode", "text", "actionAppleScript", "executablePath", "shellArguments", "url",
-        "longAction", "longKeycode", "longText", "longActionAppleScript", "longExecutablePath",
+        "action", "keycode", "text", "shiftText", "actionAppleScript", "executablePath", "shellArguments", "url",
+        "longAction", "longKeycode", "longText", "longShiftText", "longActionAppleScript", "longExecutablePath",
         "longShellArguments", "longUrl"
     ]
 }

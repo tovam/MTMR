@@ -12,7 +12,7 @@ const config = {
     title: "Bonjour",
     align: "left",
     enabled: true,
-    actions: [{ trigger: "singleTap", action: "typeText", text: "ž" }],
+    actions: [{ trigger: "singleTap", action: "typeText", text: "ž", shiftText: "Ž" }],
   }],
 };
 
@@ -70,6 +70,10 @@ const schema = {
             trigger: { type: "string", enum: ["singleTap", "doubleTap", "tripleTap", "longTap"], default: "singleTap" },
             action: { const: "typeText" },
             text: { type: "string" },
+            shiftText: {
+              type: "string",
+              description: "Variante utilisée avec Shift ou Verr. Maj.",
+            },
           },
           required: ["trigger", "action", "text"],
         },
@@ -233,6 +237,8 @@ describe("éditeur MMTMR", () => {
     await user.click(await screen.findByRole("button", { name: "Bonjour" }));
     expect(screen.getByRole("heading", { name: "Bonjour" })).toBeInTheDocument();
     expect(screen.getByDisplayValue("ž")).toBeInTheDocument();
+    expect(screen.getByDisplayValue("Ž")).toBeInTheDocument();
+    expect(screen.getByText("Texte avec Maj/Verr. Maj.")).toBeInTheDocument();
   });
 
   it("configure un Dock fixe avec recherche, statuts et réordonnancement", async () => {
@@ -777,6 +783,7 @@ describe("éditeur MMTMR", () => {
     expect(screen.getByText("Exécutable")).toBeInTheDocument();
     await user.selectOptions(actionType, "typeText");
     expect(screen.getByText("Texte UTF-8")).toBeInTheDocument();
+    expect(screen.getByText("Texte avec Maj/Verr. Maj.")).toBeInTheDocument();
     expect(screen.queryByDisplayValue("ž")).not.toBeInTheDocument();
   });
 

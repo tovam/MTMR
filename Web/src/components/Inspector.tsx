@@ -58,6 +58,7 @@ const FALLBACK_PROPERTIES: Record<string, JsonSchema> = {
 
 const ACTION_PROPERTY_LABELS: Record<string, string> = {
   text: "Texte UTF-8",
+  shiftText: "Texte avec Maj/Verr. Maj.",
   keycode: "Code de touche",
   actionAppleScript: "AppleScript",
   executablePath: "Exécutable",

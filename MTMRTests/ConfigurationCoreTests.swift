@@ -269,11 +269,30 @@ final class ConfigurationCoreTests: XCTestCase {
             "id": "unicode",
             "type": "staticButton",
             "title": "Ž",
-            "actions": [{"trigger":"longTap","action":"typeText","text":"Ž"}]
+            "actions": [{"trigger":"singleTap","action":"typeText","text":"ž","shiftText":"Ž"}]
           }]
         }
         """#)
         XCTAssertTrue(valid.isValid, "\(valid.diagnostics)")
+        XCTAssertEqual(
+            valid.document?.items.first?.actions.first?.parameters["shiftText"],
+            .string("Ž")
+        )
+
+        let invalidShiftText = codec.decode(#"{"formatVersion":1,"items":[{"id":"bad-shift","type":"staticButton","title":"ž","actions":[{"trigger":"singleTap","action":"typeText","text":"ž","shiftText":42}]}]}"#)
+        XCTAssertTrue(invalidShiftText.diagnostics.contains {
+            $0.code == "config.type" && $0.path == "$.items[0].actions[0].shiftText"
+        })
+
+        let actionDefinition = MMTMRConfigurationSchema.document.objectValue?["$defs"]?
+            .objectValue?["action"]?.objectValue
+        let typeTextVariant = actionDefinition?["oneOf"]?.arrayValue?.first {
+            $0.objectValue?["properties"]?.objectValue?["action"]?
+                .objectValue?["const"] == .string("typeText")
+        }
+        XCTAssertNotNil(
+            typeTextVariant?.objectValue?["properties"]?.objectValue?["shiftText"]
+        )
 
         let invalid = codec.decode(#"""
         {
@@ -373,6 +392,7 @@ final class ConfigurationCoreTests: XCTestCase {
             "title": "ž",
             "action": "typeText",
             "text": "ž",
+            "shiftText": "Ž",
             "longAction": "typeText",
             "longText": "Ž",
           },
@@ -384,6 +404,10 @@ final class ConfigurationCoreTests: XCTestCase {
         XCTAssertEqual(result.document.items.first?.id, "generated-1")
         XCTAssertEqual(result.document.items.first?.actions.map(\.trigger), ["singleTap", "longTap"])
         XCTAssertEqual(result.document.items.first?.actions.map(\.action), ["typeText", "typeText"])
+        XCTAssertEqual(
+            result.document.items.first?.actions.first?.parameters["shiftText"],
+            .string("Ž")
+        )
         let output = try XCTUnwrap(String(data: result.canonicalData, encoding: .utf8))
         XCTAssertFalse(output.contains("//"))
         XCTAssertFalse(output.contains("longAction"))

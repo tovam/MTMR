@@ -552,7 +552,7 @@ struct Action: Decodable {
         case none
         case hidKey(keycode: Int32)
         case keyPress(keycode: Int)
-        case typeText(text: String)
+        case typeText(text: String, shiftText: String?)
         case appleScript(source: SourceProtocol)
         case shellScript(executable: String, parameters: [String])
         case custom(closure: () -> Void)
@@ -573,6 +573,7 @@ struct Action: Decodable {
         case action
         case keycode
         case text
+        case shiftText
         case actionAppleScript
         case executablePath
         case shellArguments
@@ -599,7 +600,8 @@ struct Action: Decodable {
 
         case .some(.typeText):
             let text = try container.decode(String.self, forKey: .text)
-            value = .typeText(text: text)
+            let shiftText = try container.decodeIfPresent(String.self, forKey: .shiftText)
+            value = .typeText(text: text, shiftText: shiftText)
 
         case .some(.appleScript):
             let source = try container.decode(Source.self, forKey: .actionAppleScript)
@@ -621,6 +623,19 @@ struct Action: Decodable {
     init(trigger: Trigger, value: Value) {
         self.trigger = trigger
         self.value = value
+    }
+}
+
+extension Array where Element == Action {
+    /// Keeps existing letter configurations useful without a rewrite: their
+    /// long-tap `typeText` value becomes the modifier fallback for single tap.
+    var longTapTypeText: String? {
+        for action in self where action.trigger == .longTap {
+            if case let .typeText(text: text, shiftText: _) = action.value {
+                return text
+            }
+        }
+        return nil
     }
 }
 

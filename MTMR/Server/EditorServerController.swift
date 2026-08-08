@@ -510,7 +510,14 @@ struct EditorServerController: Sendable {
         case "typeText":
             let text = configured["text"]?.stringValue ?? ""
             let preview = text.count > 60 ? String(text.prefix(60)) + "…" : text
-            operation = "type the Unicode text “\(preview)”"
+            if let shiftText = configured["shiftText"]?.stringValue {
+                let shiftPreview = shiftText.count > 60
+                    ? String(shiftText.prefix(60)) + "…"
+                    : shiftText
+                operation = "type the Unicode text “\(preview)”, or “\(shiftPreview)” with Shift/Caps Lock"
+            } else {
+                operation = "type the Unicode text “\(preview)”"
+            }
         case "keyPress", "hidKey":
             let keycode = configured["keycode"]?.numberValue.map { String(Int($0)) } ?? "?"
             operation = "send \(actionType) keycode \(keycode)"
