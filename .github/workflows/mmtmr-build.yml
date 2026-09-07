@@ -59,6 +59,7 @@ jobs:
       - name: Run Swift tests
         run: |
           set -o pipefail
+          set +e
           xcodebuild test \
             -project MTMR.xcodeproj \
             -scheme MMTMR \
@@ -74,10 +75,20 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             2>&1 | tee "$CI_ROOT/swift-tests.log"
+          XCODE_STATUS=${PIPESTATUS[0]}
+          set -e
+          if test "$XCODE_STATUS" -ne 0; then
+            set +o pipefail
+            grep -E '(^|: )(error:|fatal error:)|Testing failed:' "$CI_ROOT/swift-tests.log" \
+              | tail -n 20 \
+              | sed 's/^/::error title=Xcode test::/'
+            exit "$XCODE_STATUS"
+          fi
 
       - name: Archive the unsigned application
         run: |
           set -o pipefail
+          set +e
           xcodebuild archive \
             -project MTMR.xcodeproj \
             -scheme MMTMR \
@@ -92,6 +103,15 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             2>&1 | tee "$CI_ROOT/archive.log"
+          XCODE_STATUS=${PIPESTATUS[0]}
+          set -e
+          if test "$XCODE_STATUS" -ne 0; then
+            set +o pipefail
+            grep -E '(^|: )(error:|fatal error:)' "$CI_ROOT/archive.log" \
+              | tail -n 20 \
+              | sed 's/^/::error title=Xcode archive::/'
+            exit "$XCODE_STATUS"
+          fi
 
       - name: Verify the application archive
         run: |
