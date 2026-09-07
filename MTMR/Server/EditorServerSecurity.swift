@@ -13,6 +13,10 @@ struct MMTMREditorServerConfiguration: Sendable {
     let webSocketMessageLimitPerMinute: Int
     let editorRootURL: URL?
     let stateHandler: @Sendable (MMTMREditorServerState) -> Void
+    /// Called after an authenticated event-stream subscriber is added or removed.
+    /// Keeping this separate from the server lifecycle lets the AppKit runtime avoid
+    /// collecting expensive preview state while the editor is closed.
+    let subscriberCountHandler: @Sendable (Int) -> Void
 
     init(
         port: Int = MMTMREditorServerConfiguration.defaultPort,
@@ -22,7 +26,8 @@ struct MMTMREditorServerConfiguration: Sendable {
         webSocketConnectionLimit: Int = 4,
         webSocketMessageLimitPerMinute: Int = 120,
         editorRootURL: URL? = Bundle.main.resourceURL?.appendingPathComponent("Editor", isDirectory: true),
-        stateHandler: @escaping @Sendable (MMTMREditorServerState) -> Void = { _ in }
+        stateHandler: @escaping @Sendable (MMTMREditorServerState) -> Void = { _ in },
+        subscriberCountHandler: @escaping @Sendable (Int) -> Void = { _ in }
     ) {
         precondition((1...65_535).contains(port), "Editor port must be between 1 and 65535")
         precondition(bodyLimit > 0, "Editor request body limit must be positive")
@@ -37,6 +42,7 @@ struct MMTMREditorServerConfiguration: Sendable {
         self.webSocketMessageLimitPerMinute = webSocketMessageLimitPerMinute
         self.editorRootURL = editorRootURL
         self.stateHandler = stateHandler
+        self.subscriberCountHandler = subscriberCountHandler
     }
 
     var serverURL: URL {

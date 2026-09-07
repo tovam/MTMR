@@ -70,31 +70,38 @@ esac
 
 had_previous=false
 if [ -d "$installed_app" ]; then
-    /bin/mv "$installed_app" "$previous_app"
+    # Keep the top-level application directory in place. Legacy macOS login
+    # items are aliases and follow a bundle when it is moved; moving the old
+    # app into build-checks made the next login launch that obsolete backup.
+    ditto "$installed_app" "$previous_app"
+    /bin/rm -rf "$installed_app/Contents"
     had_previous=true
 fi
 
 if ! ditto "$signed_app" "$installed_app"; then
-    /bin/mv "$installed_app" "$failed_app" 2>/dev/null || true
+    ditto "$installed_app" "$failed_app" 2>/dev/null || true
+    /bin/rm -rf "$installed_app/Contents"
     if [ "$had_previous" = true ]; then
-        /bin/mv "$previous_app" "$installed_app"
+        ditto "$previous_app" "$installed_app"
     fi
     exit 1
 fi
 
 if ! codesign --verify --deep --strict "$installed_app"; then
-    /bin/mv "$installed_app" "$failed_app"
+    ditto "$installed_app" "$failed_app"
+    /bin/rm -rf "$installed_app/Contents"
     if [ "$had_previous" = true ]; then
-        /bin/mv "$previous_app" "$installed_app"
+        ditto "$previous_app" "$installed_app"
     fi
     exit 1
 fi
 
 installed_requirement=$(codesign -d -r- "$installed_app" 2>&1 | sed -n 's/^designated => //p')
 if [ "$installed_requirement" != "$designated_requirement" ]; then
-    /bin/mv "$installed_app" "$failed_app"
+    ditto "$installed_app" "$failed_app"
+    /bin/rm -rf "$installed_app/Contents"
     if [ "$had_previous" = true ]; then
-        /bin/mv "$previous_app" "$installed_app"
+        ditto "$previous_app" "$installed_app"
     fi
     echo "The installed signature does not match the verified source signature." >&2
     exit 70

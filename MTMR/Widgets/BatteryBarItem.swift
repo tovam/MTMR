@@ -46,8 +46,12 @@ class BatteryInfo: NSObject {
     var loop: CFRunLoopSource?
 
     func start(notifyBlock: @escaping () -> Void) {
+        stop()
         self.notifyBlock = notifyBlock
-        let opaque = Unmanaged.passRetained(self).toOpaque()
+        // The owner retains BatteryInfo for at least as long as this run-loop
+        // source is installed. An additional retained context would leak once
+        // per start/stop cycle (for example whenever the web editor reconnects).
+        let opaque = Unmanaged.passUnretained(self).toOpaque()
         let context = UnsafeMutableRawPointer(opaque)
         loop = IOPSNotificationCreateRunLoopSource({ context in
             guard let ctx = context else {

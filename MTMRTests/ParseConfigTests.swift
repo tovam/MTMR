@@ -91,6 +91,15 @@ class ParseConfig: XCTestCase {
         }
     }
 
+    func testMicrophoneItemDecodesAsNativeComponent() throws {
+        let fixture = #"[{"type":"microphone"}]"#.data(using: .utf8)!
+        let items = try JSONDecoder().decode([BarItemDefinition].self, from: fixture)
+        guard case .microphone? = items.first?.type else {
+            return XCTFail("Expected the native microphone component")
+        }
+        XCTAssertTrue(items.first?.actions.isEmpty == true)
+    }
+
     func testPhysicalSystemButtonsDecodeToNativeMediaKeys() throws {
         let fixture = """
             [

@@ -313,6 +313,7 @@ enum ItemType: Decodable {
         spacing: Double
     )
     case volume
+    case microphone
     case brightness(refreshInterval: Double)
     case weather(interval: Double, units: String, api_key: String, icon_type: String)
     case yandexWeather(interval: Double)
@@ -377,6 +378,7 @@ enum ItemType: Decodable {
         case dock
         case pinnedDock
         case volume
+        case microphone
         case brightness
         case weather
         case yandexWeather
@@ -457,6 +459,9 @@ enum ItemType: Decodable {
 
         case .volume:
             self = .volume
+
+        case .microphone:
+            self = .microphone
 
         case .brightness:
             let interval = try container.decodeIfPresent(Double.self, forKey: .refreshInterval) ?? 0.5

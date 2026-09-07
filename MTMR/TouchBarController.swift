@@ -47,6 +47,7 @@ extension ItemType {
         case .dock(autoResize: _, filter: _): return "dock"
         case .pinnedDock(autoResize: _, applications: _, showRunningIndicator: _, longPressAction: _, spacing: _): return "pinnedDock"
         case .volume: return "volume"
+        case .microphone: return "microphone"
         case .brightness(refreshInterval: _): return "brightness"
         case .weather(interval: _, units: _, api_key: _, icon_type: _): return "weather"
         case .yandexWeather(interval: _): return "yandexWeather"
@@ -86,6 +87,8 @@ extension ItemType {
             return "com.tovam.MMTMR.pinnedDock"
         case .volume:
             return "com.tovam.MMTMR.volume"
+        case .microphone:
+            return "com.tovam.MMTMR.microphone."
         case .brightness(refreshInterval: _):
             return "com.tovam.MMTMR.brightness"
         case .weather(interval: _, units: _, api_key: _, icon_type: _):
@@ -778,6 +781,8 @@ class TouchBarController: NSObject, NSTouchBarDelegate {
             } else {
                 barItem = VolumeViewController(identifier: identifier)
             }
+        case .microphone:
+            barItem = MicrophoneBarItem(identifier: identifier)
         case let .brightness(refreshInterval: interval):
             if case let .image(source)? = item.additionalParameters[.image] {
                 barItem = BrightnessViewController(identifier: identifier, refreshInterval: interval, image: source.image)

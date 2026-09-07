@@ -4,11 +4,17 @@ actor EditorServerEventHub {
     private var continuations: [UUID: AsyncStream<ServerEvent>.Continuation] = [:]
     private var latestRuntimeSnapshot: ServerEvent?
     private var latestSimulationContext: ServerEvent?
+    private let subscriberCountHandler: @Sendable (Int) -> Void
+
+    init(subscriberCountHandler: @escaping @Sendable (Int) -> Void = { _ in }) {
+        self.subscriberCountHandler = subscriberCountHandler
+    }
 
     func stream() -> AsyncStream<ServerEvent> {
         let id = UUID()
         let (stream, continuation) = AsyncStream<ServerEvent>.makeStream(bufferingPolicy: .bufferingNewest(128))
         continuations[id] = continuation
+        subscriberCountHandler(continuations.count)
         if let latestRuntimeSnapshot { continuation.yield(latestRuntimeSnapshot) }
         if let latestSimulationContext { continuation.yield(latestSimulationContext) }
         continuation.onTermination = { [weak self] _ in
@@ -39,13 +45,17 @@ actor EditorServerEventHub {
             continuation.finish()
         }
         continuations.removeAll()
+        subscriberCountHandler(0)
         latestRuntimeSnapshot = nil
         latestSimulationContext = nil
     }
 
     private func removeContinuation(id: UUID) {
-        continuations.removeValue(forKey: id)
+        guard continuations.removeValue(forKey: id) != nil else { return }
+        subscriberCountHandler(continuations.count)
     }
+
+    func subscriberCount() -> Int { continuations.count }
 }
 
 actor EditorPreviewStore {

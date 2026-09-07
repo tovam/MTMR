@@ -67,13 +67,17 @@ class CustomButtonTouchBarItem: NSCustomTouchBarItem, NSGestureRecognizerDelegat
 
     var isBordered: Bool = true {
         didSet {
+            guard isBordered != oldValue else { return }
             reinstallButton()
+            NotificationCenter.default.post(name: .mmtmrRuntimeVisualDidChange, object: nil)
         }
     }
 
     var backgroundColor: NSColor? {
         didSet {
+            guard !Self.colorsAreEqual(backgroundColor, oldValue) else { return }
             reinstallButton()
+            NotificationCenter.default.post(name: .mmtmrRuntimeVisualDidChange, object: nil)
         }
     }
 
@@ -82,20 +86,48 @@ class CustomButtonTouchBarItem: NSCustomTouchBarItem, NSGestureRecognizerDelegat
             return attributedTitle.string
         }
         set {
-            attributedTitle = newValue.defaultTouchbarAttributedString
+            let nextTitle = newValue.defaultTouchbarAttributedString
+            guard !attributedTitle.isEqual(to: nextTitle) else { return }
+            attributedTitle = nextTitle
         }
     }
 
     var attributedTitle: NSAttributedString {
         didSet {
+            guard !attributedTitle.isEqual(to: oldValue) else { return }
             button?.imagePosition = attributedTitle.length > 0 ? .imageLeading : .imageOnly
             button?.attributedTitle = attributedTitle
+            NotificationCenter.default.post(name: .mmtmrRuntimeVisualDidChange, object: nil)
         }
     }
 
     var image: NSImage? {
         didSet {
+            guard !Self.imagesAreEqual(image, oldValue) else { return }
             button.image = image
+            NotificationCenter.default.post(name: .mmtmrRuntimeVisualDidChange, object: nil)
+        }
+    }
+
+    private static func colorsAreEqual(_ lhs: NSColor?, _ rhs: NSColor?) -> Bool {
+        switch (lhs, rhs) {
+        case (nil, nil):
+            return true
+        case let (lhs?, rhs?):
+            return lhs.isEqual(rhs)
+        default:
+            return false
+        }
+    }
+
+    private static func imagesAreEqual(_ lhs: NSImage?, _ rhs: NSImage?) -> Bool {
+        switch (lhs, rhs) {
+        case (nil, nil):
+            return true
+        case let (lhs?, rhs?):
+            return lhs === rhs || lhs.isEqual(rhs)
+        default:
+            return false
         }
     }
 

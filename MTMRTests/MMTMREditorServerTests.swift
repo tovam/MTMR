@@ -7,6 +7,23 @@ import XCTest
 @testable import MMTMRServerBuildCheck
 #endif
 
+private final class SubscriberCountRecorder: @unchecked Sendable {
+    private let lock = NSLock()
+    private var recordedValues: [Int] = []
+
+    func append(_ value: Int) {
+        lock.lock()
+        defer { lock.unlock() }
+        recordedValues.append(value)
+    }
+
+    func values() -> [Int] {
+        lock.lock()
+        defer { lock.unlock() }
+        return recordedValues
+    }
+}
+
 final class MMTMREditorServerTests: XCTestCase {
     func testWebSocketLimiterBoundsConnectionsAndMessages() async {
         let limiter = EditorWebSocketLimiter(connectionLimit: 1, messageLimit: 2, window: 60)
@@ -104,6 +121,23 @@ final class MMTMREditorServerTests: XCTestCase {
         let replayedEvent = await reconnectIterator.next()
         XCTAssertEqual(replayedEvent, complete)
         await hub.finish()
+    }
+
+    func testEventHubReportsSubscriberCountTransitions() async {
+        let recorder = SubscriberCountRecorder()
+        let hub = EditorServerEventHub { count in
+            recorder.append(count)
+        }
+
+        let first = await hub.stream()
+        let second = await hub.stream()
+        let count = await hub.subscriberCount()
+        XCTAssertEqual(count, 2)
+        _ = first
+        _ = second
+        await hub.finish()
+
+        XCTAssertEqual(recorder.values(), [1, 2, 0])
     }
 
     func testRootCreatesStrictSessionAndStatusRequiresIt() async throws {

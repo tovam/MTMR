@@ -4,7 +4,7 @@ struct ConfigValidator {
     static let supportedItemTypes: Set<String> = [
         "staticButton", "appleScriptTitledButton", "shellScriptTitledButton", "timeButton",
         "battery", "cpu", "memory", "dock", "pinnedDock", "volume", "brightness", "weather", "yandexWeather",
-        "currency", "inputsource", "music", "group", "nightShift", "dnd", "pomodoro",
+        "currency", "inputsource", "music", "group", "nightShift", "dnd", "pomodoro", "microphone",
         "network", "darkMode", "swipe", "upnext", "escape", "delete", "brightnessUp",
         "brightnessDown", "illuminationUp", "illuminationDown", "volumeDown", "volumeUp",
         "mute", "previous", "play", "next", "sleep", "displaySleep", "exitTouchbar", "close"
@@ -45,7 +45,7 @@ struct ConfigValidator {
     ]
 
     private static let allItemKeys = itemSpecificKeys.values.reduce(commonItemKeys, { $0.union($1) })
-    private static let nonActionableItemTypes: Set<String> = ["cpu", "memory", "dock", "pinnedDock", "volume", "brightness", "group", "swipe", "upnext"]
+    private static let nonActionableItemTypes: Set<String> = ["cpu", "memory", "dock", "pinnedDock", "volume", "microphone", "brightness", "group", "swipe", "upnext"]
 
     private static let stringItemKeys: Set<String> = [
         "notes", "editorName", "background", "title", "matchAppId", "timeZone", "units", "api_key",

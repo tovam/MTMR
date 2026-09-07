@@ -52,7 +52,7 @@ void sharedFileListDidChange(LSSharedFileListRef inList, void *context)
     self = [super init];
     loginItems = LSSharedFileListCreate(NULL, kLSSharedFileListSessionLoginItems, NULL);
     LSSharedFileListAddObserver(loginItems, CFRunLoopGetMain(),
-                                (CFStringRef)NSDefaultRunLoopMode, sharedFileListDidChange, (voidPtr)CFBridgingRetain(self));
+                                (CFStringRef)NSDefaultRunLoopMode, sharedFileListDidChange, (__bridge void *)(self));
     return self;
 }
 
@@ -84,6 +84,36 @@ LSSharedFileListItemRef copyItemWithURLinFileList(NSURL* wantedURL, LSSharedFile
     
     return NULL;
 }
+
+static BOOL MMTMRLoginItemURLMatchesApplication(NSURL *itemURL)
+{
+    if (itemURL == nil)
+        return NO;
+
+    static NSSet<NSString *> *bundleIdentifiers;
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        bundleIdentifiers = [NSSet setWithArray:@[
+            @"Toxblh.MTMR",
+            @"com.toxblh.MTMR",
+            @"com.tovam.MTMR",
+            @"com.tovam.MMTMR"
+        ]];
+    });
+
+    NSString *bundleIdentifier = [NSBundle bundleWithURL:itemURL].bundleIdentifier;
+    if (bundleIdentifier != nil && [bundleIdentifiers containsObject:bundleIdentifier])
+        return YES;
+
+    // A moved or partially replaced bundle may no longer have readable metadata.
+    NSString *name = itemURL.lastPathComponent.lowercaseString;
+    return [name isEqualToString:@"mmtmr.app"] || [name isEqualToString:@"mtmr.app"];
+}
+
+static NSURL *MMTMRStandardizedFileURL(NSURL *URL)
+{
+    return URL.filePathURL.URLByStandardizingPath;
+}
 #pragma clang diagnostic pop
 
 - (BOOL) willLaunchAtLogin: (NSURL*) itemURL
@@ -103,6 +133,45 @@ LSSharedFileListItemRef copyItemWithURLinFileList(NSURL* wantedURL, LSSharedFile
     if (appItem) {
         CFRelease(appItem);
     }
+}
+
+- (BOOL) repairLaunchAtLoginForURL: (NSURL*) itemURL
+{
+    if (itemURL == nil || loginItems == NULL)
+        return NO;
+
+    NSURL *wantedURL = MMTMRStandardizedFileURL(itemURL);
+    NSArray *snapshot = (__bridge_transfer NSArray *)LSSharedFileListCopySnapshot(loginItems, NULL);
+    NSMutableArray *matchingItems = [NSMutableArray array];
+    NSUInteger currentURLCount = 0;
+
+    for (id value in snapshot) {
+        LSSharedFileListItemRef item = (__bridge LSSharedFileListItemRef)value;
+        UInt32 flags = kLSSharedFileListNoUserInteraction | kLSSharedFileListDoNotMountVolumes;
+        CFURLRef resolvedURL = NULL;
+        if (LSSharedFileListItemResolve(item, flags, &resolvedURL, NULL) != noErr || resolvedURL == NULL)
+            continue;
+
+        NSURL *URL = CFBridgingRelease(resolvedURL);
+        if (!MMTMRLoginItemURLMatchesApplication(URL))
+            continue;
+
+        [matchingItems addObject:value];
+        if ([MMTMRStandardizedFileURL(URL) isEqual:wantedURL])
+            currentURLCount += 1;
+    }
+
+    if (matchingItems.count == 0 || (matchingItems.count == 1 && currentURLCount == 1))
+        return NO;
+
+    // Preserve the user's enabled choice, but collapse duplicates and stale
+    // aliases onto the currently executing application bundle.
+    for (id value in matchingItems) {
+        LSSharedFileListItemRemove(loginItems, (__bridge LSSharedFileListItemRef)value);
+    }
+    LSSharedFileListInsertItemURL(loginItems, kLSSharedFileListItemBeforeFirst,
+                                  NULL, NULL, (__bridge CFURLRef)wantedURL, NULL, NULL);
+    return YES;
 }
 
 #pragma mark Basic Interface

@@ -5,6 +5,8 @@ class AppleScriptTouchBarItem: CustomButtonTouchBarItem {
     private let interval: TimeInterval
     private var forceHideConstraint: NSLayoutConstraint!
     private let alternativeImages: [String: SourceProtocol]
+    private var lastScriptResult: String?
+    private var lastIconLabel: String?
 
     init?(identifier: NSTouchBarItem.Identifier, source: SourceProtocol, interval: TimeInterval, alternativeImages: [String: SourceProtocol]) {
         self.interval = interval
@@ -47,12 +49,19 @@ class AppleScriptTouchBarItem: CustomButtonTouchBarItem {
             print("refresh happened (interval \(interval)), self \(identifier.rawValue))")
         #endif
         let scriptResult = execute()
-        DispatchQueue.main.async {
-            self.title = scriptResult
-            self.forceHideConstraint.isActive = scriptResult == ""
-            #if DEBUG
-                print("did set new script result title \(scriptResult)")
-            #endif
+        if scriptResult != lastScriptResult {
+            lastScriptResult = scriptResult
+            DispatchQueue.main.async {
+                self.title = scriptResult
+                let shouldHide = scriptResult == ""
+                if self.forceHideConstraint.isActive != shouldHide {
+                    self.forceHideConstraint.isActive = shouldHide
+                    NotificationCenter.default.post(name: .mmtmrRuntimeVisualDidChange, object: nil)
+                }
+                #if DEBUG
+                    print("did set new script result title \(scriptResult)")
+                #endif
+            }
         }
         DispatchQueue.appleScriptQueue.asyncAfter(deadline: .now() + interval) { [weak self] in
             self?.refreshAndSchedule()
@@ -60,9 +69,11 @@ class AppleScriptTouchBarItem: CustomButtonTouchBarItem {
     }
 
     func updateIcon(iconLabel: String) {
-        if alternativeImages[iconLabel] != nil {
+        if let source = alternativeImages[iconLabel] {
+            guard iconLabel != lastIconLabel else { return }
+            lastIconLabel = iconLabel
             DispatchQueue.main.async {
-                self.image = self.alternativeImages[iconLabel]!.image
+                self.image = source.image
             }
         } else {
             print("Cannot find icon with label \"\(iconLabel)\"")

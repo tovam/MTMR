@@ -9,6 +9,11 @@ private struct RuntimeConfigurationApplyError: LocalizedError, Sendable {
     }
 }
 
+extension Notification.Name {
+    /// Posted by Touch Bar views when their editor-visible title or image changes.
+    static let mmtmrRuntimeVisualDidChange = Notification.Name("com.tovam.MMTMR.runtimeVisualDidChange")
+}
+
 @main
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
@@ -27,7 +32,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var preparedRuntimeItems: [String: [RuntimeBarItem]] = [:]
     private let networkMonitor = NWPathMonitor()
     private var networkConnected = false
-    private var runtimeSnapshotTimer: Timer?
+    private let runtimeBatteryInfo = BatteryInfo()
+    private var runtimeBatteryMonitoringStarted = false
+    private var editorSubscriberCount = 0
+    private var runtimeSnapshotTask: Task<Void, Never>?
+    private var pendingRuntimeSnapshotRevision: UInt64?
+    private var pendingRuntimeSnapshotForce = false
     private var lastRuntimeSnapshotHash: String?
     private let runtimeContextTimeFormatter: DateFormatter = {
         let formatter = DateFormatter()
@@ -48,6 +58,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         configureLaunchOptions()
+        repairLaunchAtLoginRegistration()
         bootstrapConfiguration()
         configureStatusItem()
         configureRuntimeContextMonitoring()
@@ -79,9 +90,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         terminating = true
         coordinator?.stopWatching()
         networkMonitor.cancel()
-        runtimeSnapshotTimer?.invalidate()
-        runtimeSnapshotTimer = nil
+        runtimeBatteryInfo.stop()
+        runtimeSnapshotTask?.cancel()
+        runtimeSnapshotTask = nil
         NotificationCenter.default.removeObserver(self, name: .mmtmrInputDispatchDidComplete, object: nil)
+        NotificationCenter.default.removeObserver(self, name: .mmtmrRuntimeVisualDidChange, object: nil)
 
         guard let editorServer else { return .terminateNow }
         Task {
@@ -98,7 +111,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             isBlockedApp = false
         }
         createMenu()
-        publishRuntimeSnapshot()
+        scheduleRuntimeSnapshot()
     }
 
     @objc private func openEditor(_: Any?) {
@@ -132,6 +145,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             name: .mmtmrInputDispatchDidComplete,
             object: nil
         )
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(runtimeVisualDidChange(_:)),
+            name: .mmtmrRuntimeVisualDidChange,
+            object: nil
+        )
     }
 
     @objc private func requestSystemInputAccess(_: Any?) {
@@ -141,7 +160,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func requestSystemInputAccess(openSettingsIfDenied: Bool) {
         let granted = InputAccessCoordinator.shared.requestCoreGraphicsPostEventAccessIfNeeded()
         createMenu()
-        publishRuntimeSnapshot(force: true)
+        scheduleRuntimeSnapshot(force: true)
 
         guard !granted, openSettingsIfDenied,
               let settingsURL = URL(
@@ -167,7 +186,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             )
         }
         createMenu()
-        publishRuntimeSnapshot()
+        scheduleRuntimeSnapshot()
+    }
+
+    @objc private func runtimeVisualDidChange(_: Notification) {
+        scheduleRuntimeSnapshot()
     }
 
     @objc private func changeEditorPort(_: Any?) {
@@ -253,6 +276,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    private func repairLaunchAtLoginRegistration() {
+        _ = LaunchAtLoginController().repairLaunchAtLogin(for: Bundle.main.bundleURL)
+    }
+
     private func bootstrapConfiguration() {
         let canonicalURL = MMTMRConfigurationLocation.canonicalURL().standardizedFileURL
         let legacyURLs = configurationURL.standardizedFileURL == canonicalURL
@@ -293,7 +320,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                         centerOffset: request.centerOffset,
                         pointsPerMillimeter: request.pointsPerMillimeter
                     )
-                    self?.publishRuntimeSnapshot(force: true)
+                    self?.scheduleRuntimeSnapshot(force: true)
                     return ServerTouchBarCalibrationState(
                         active: state.calibrationActive,
                         hardwareModel: state.hardwareModel,
@@ -319,16 +346,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             Task { @MainActor [weak self] in
                 guard let self else { return }
                 networkConnected = path.status == .satisfied
-                publishRuntimeSnapshot()
+                scheduleRuntimeSnapshot()
             }
         }
         networkMonitor.start(queue: DispatchQueue(label: "com.tovam.MMTMR.network-context"))
 
-        let timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
-            Task { @MainActor [weak self] in self?.publishRuntimeSnapshot() }
-        }
-        timer.tolerance = 0.2
-        runtimeSnapshotTimer = timer
     }
 
     private func startConfigurationWatcher() {
@@ -384,7 +406,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             )
             lastRuntimeError = nil
             DispatchQueue.main.async { [weak self] in
-                self?.publishRuntimeSnapshot(revision: snapshot.revision, force: true)
+                self?.scheduleRuntimeSnapshot(revision: snapshot.revision, force: true)
             }
             return true
         } catch {
@@ -573,6 +595,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 Task { @MainActor [weak self] in
                     self?.editorServerDidChangeState(state)
                 }
+            },
+            subscriberCountHandler: { [weak self] count in
+                Task { @MainActor [weak self] in
+                    self?.editorSubscriberCountDidChange(count)
+                }
             }
         )
         let server = MMTMREditorServer(configuration: configuration, provider: serverProvider)
@@ -596,8 +623,38 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         createMenu()
         if case .running = state, let snapshot = coordinator?.snapshot() {
             publishConfiguration(snapshot)
-            publishRuntimeSnapshot(revision: snapshot.revision, force: true)
         }
+    }
+
+    private func editorSubscriberCountDidChange(_ count: Int) {
+        let previousCount = editorSubscriberCount
+        editorSubscriberCount = count
+        guard count > 0 else {
+            runtimeSnapshotTask?.cancel()
+            runtimeSnapshotTask = nil
+            pendingRuntimeSnapshotRevision = nil
+            pendingRuntimeSnapshotForce = false
+            if runtimeBatteryMonitoringStarted {
+                runtimeBatteryInfo.stop()
+                runtimeBatteryMonitoringStarted = false
+            }
+            return
+        }
+        guard previousCount == 0 else { return }
+        // A new editor session must receive a complete current payload, even if no
+        // Touch Bar property has changed since the last session disconnected.
+        runtimeBatteryInfo.getPSInfo()
+        if !runtimeBatteryMonitoringStarted {
+            runtimeBatteryMonitoringStarted = true
+            runtimeBatteryInfo.start { [weak self] in
+                DispatchQueue.main.async { [weak self] in
+                    guard let self, self.editorSubscriberCount > 0 else { return }
+                    self.runtimeBatteryInfo.getPSInfo()
+                    self.scheduleRuntimeSnapshot()
+                }
+            }
+        }
+        publishRuntimeSnapshot(force: true)
     }
 
     private func publishConfiguration(_ snapshot: ConfigurationSnapshot) {
@@ -613,7 +670,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func publishRuntimeSnapshot(revision: UInt64? = nil, force: Bool = false) {
-        guard let editorServer else { return }
+        guard editorSubscriberCount > 0, let editorServer else { return }
         let runtimeGeometry = TouchBarController.shared.runtimeGeometry()
         let completeGeometry: [ServerJSONValue] = runtimeGeometry.map { item in
             var object: [String: ServerJSONValue] = [
@@ -654,12 +711,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             return .object(object)
         }
 
-        let batteryInfo = BatteryInfo()
-        batteryInfo.getPSInfo()
         let theme = NSApp.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua ? "dark" : "light"
         let context: ServerJSONValue = .object([
             "application": .string(TouchBarController.shared.frontmostApplicationIdentifier ?? ""),
-            "battery": .number(Double(batteryInfo.current)),
+            "battery": .number(Double(runtimeBatteryInfo.current)),
             "inputAccess": .bool(CGPreflightPostEventAccess()),
             "networkConnected": .bool(networkConnected),
             "theme": .string(theme),
@@ -710,6 +765,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         )
         Task {
             await editorServer.publish(event, cachedRuntimeSnapshot: completeEvent)
+        }
+    }
+
+    /// Coalesces visual/context changes to keep rapid AppKit updates responsive
+    /// without repeatedly encoding full Touch Bar snapshots.
+    private func scheduleRuntimeSnapshot(revision: UInt64? = nil, force: Bool = false) {
+        guard editorSubscriberCount > 0 else { return }
+        if let revision { pendingRuntimeSnapshotRevision = revision }
+        pendingRuntimeSnapshotForce = pendingRuntimeSnapshotForce || force
+        guard runtimeSnapshotTask == nil else { return }
+        runtimeSnapshotTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .milliseconds(40))
+            guard !Task.isCancelled, let self else { return }
+            self.runtimeSnapshotTask = nil
+            let revision = self.pendingRuntimeSnapshotRevision
+            let force = self.pendingRuntimeSnapshotForce
+            self.pendingRuntimeSnapshotRevision = nil
+            self.pendingRuntimeSnapshotForce = false
+            self.publishRuntimeSnapshot(revision: revision, force: force)
         }
     }
 

@@ -127,6 +127,7 @@ private final class SystemUsageGraphView: NSView, RuntimeRenderSignatureProvidin
             samples.removeFirst(samples.count - 512)
         }
         needsDisplay = true
+        NotificationCenter.default.post(name: .mmtmrRuntimeVisualDidChange, object: nil)
     }
 
     override func draw(_ dirtyRect: NSRect) {

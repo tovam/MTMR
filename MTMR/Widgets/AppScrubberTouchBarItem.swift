@@ -399,21 +399,34 @@ public class DockItem: NSObject {
 
 private let iconWidth = 32.0
 class DockBarItem: CustomButtonTouchBarItem {
+    private struct DotState: Equatable {
+        let visible: Bool
+        let frontmost: Bool
+    }
+
     let dotView = NSView(frame: .zero)
     let dockItem: DockItem
     fileprivate var killGestureRecognizer: LongPressGestureRecognizer!
     var killAppClosure: () -> Void = { }
+    private var renderedDotState: DotState?
 
     var showsRunningIndicator = true {
-        didSet { redrawDotView() }
+        didSet {
+            guard showsRunningIndicator != oldValue else { return }
+            redrawDotView()
+        }
     }
 
     var allowsKillGesture = true {
-        didSet { updateKillGestureState() }
+        didSet {
+            guard allowsKillGesture != oldValue else { return }
+            updateKillGestureState()
+        }
     }
     
     var isRunning = false {
         didSet {
+            guard isRunning != oldValue else { return }
             redrawDotView()
             updateKillGestureState()
         }
@@ -421,6 +434,7 @@ class DockBarItem: CustomButtonTouchBarItem {
     
     var isFrontmost = false {
         didSet {
+            guard isFrontmost != oldValue else { return }
             redrawDotView()
         }
     }
@@ -450,9 +464,13 @@ class DockBarItem: CustomButtonTouchBarItem {
     
     func redrawDotView() {
         let visible = showsRunningIndicator && isRunning
+        let state = DotState(visible: visible, frontmost: visible && isFrontmost)
+        guard state != renderedDotState else { return }
+        renderedDotState = state
         dotView.layer?.backgroundColor = visible ? NSColor.white.cgColor : NSColor.clear.cgColor
         dotView.frame.size = NSSize(width: visible && isFrontmost ? iconWidth - 14 : 3, height: 3)
         dotView.setFrameOrigin(NSPoint(x: 18.0 - Double(dotView.frame.size.width) / 2.0, y: iconWidth - 5))
+        NotificationCenter.default.post(name: .mmtmrRuntimeVisualDidChange, object: nil)
     }
 
     private func updateKillGestureState() {

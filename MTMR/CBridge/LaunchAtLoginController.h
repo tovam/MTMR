@@ -32,4 +32,8 @@
 - (BOOL) willLaunchAtLogin: (NSURL*) itemURL;
 - (void) setLaunchAtLogin: (BOOL) enabled forURL: (NSURL*) itemURL;
 
+/// Replaces stale MTMR/MMTMR login aliases with the currently running bundle.
+/// Returns YES when the login-items list was changed.
+- (BOOL) repairLaunchAtLoginForURL: (NSURL*) itemURL;
+
 @end

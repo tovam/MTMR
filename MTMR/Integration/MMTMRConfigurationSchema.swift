@@ -169,6 +169,7 @@ enum MMTMRConfigurationSchema {
                 "spacing": numberProperty(defaultValue: 1, minimum: -12, maximum: 20),
             ], required: ["applications"]),
             itemVariant("volume", title: "Volume"),
+            itemVariant("microphone", title: "Microphone"),
             itemVariant("brightness", title: "Brightness", fields: ["refreshInterval": numberProperty(defaultValue: 0.5, minimum: 0.001)]),
             itemVariant("weather", title: "Weather", fields: [
                 "refreshInterval": numberProperty(defaultValue: 1800, minimum: 0.001),

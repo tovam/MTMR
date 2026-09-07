@@ -35,7 +35,7 @@ final class MMTMREditorServer: @unchecked Sendable {
             provider: provider,
             assets: resolvedAssets,
             security: security ?? EditorServerSecurity(configuration: configuration),
-            events: EditorServerEventHub(),
+            events: EditorServerEventHub(subscriberCountHandler: configuration.subscriberCountHandler),
             preview: EditorPreviewStore(),
             mutationRateLimiter: EditorMutationRateLimiter(limit: configuration.mutationLimitPerMinute),
             webSocketLimiter: EditorWebSocketLimiter(
