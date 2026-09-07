@@ -55,6 +55,11 @@ enum ServerJSONValue: Codable, Equatable, Sendable {
         return object
     }
 
+    var arrayValue: [ServerJSONValue]? {
+        guard case .array(let array) = self else { return nil }
+        return array
+    }
+
     var stringValue: String? {
         guard case .string(let string) = self else { return nil }
         return string
