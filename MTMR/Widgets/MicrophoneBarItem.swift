@@ -44,7 +44,9 @@ final class MicrophoneBarItem: NSCustomTouchBarItem {
     }
 
     override init(identifier: NSTouchBarItem.Identifier) {
-        button = NSButton(image: NSImage(systemSymbolName: "mic.fill", accessibilityDescription: "Microphone"), target: nil, action: nil)
+        let initialImage = NSImage(systemSymbolName: "mic.fill", accessibilityDescription: "Microphone")
+            ?? NSImage(size: NSSize(width: 18, height: 18))
+        button = NSButton(image: initialImage, target: nil, action: nil)
         super.init(identifier: identifier)
 
         button.target = self
