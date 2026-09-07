@@ -94,11 +94,27 @@ jobs:
       - name: Verify the application archive
         run: |
           APP_PATH="$CI_ROOT/MMTMR.xcarchive/Products/Applications/MMTMR.app"
-          test -x "$APP_PATH/Contents/MacOS/MMTMR"
-          test -f "$APP_PATH/Contents/Resources/Editor/index.html"
-          test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$APP_PATH/Contents/Info.plist")" = "com.tovam.MMTMR"
-          codesign --force --deep --sign - "$APP_PATH"
-          codesign --verify --deep --strict --verbose=2 "$APP_PATH"
+          if ! test -x "$APP_PATH/Contents/MacOS/MMTMR"; then
+            echo "::error title=Archive incomplet::L’exécutable MMTMR est absent de l’archive"
+            exit 1
+          fi
+          if ! test -f "$APP_PATH/Contents/Resources/Editor/index.html"; then
+            echo "::error title=Éditeur absent::Le build web n’a pas été intégré au bundle"
+            exit 1
+          fi
+          BUNDLE_ID=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$APP_PATH/Contents/Info.plist")
+          if test "$BUNDLE_ID" != "com.tovam.MMTMR"; then
+            echo "::error title=Bundle incorrect::Identifiant trouvé : $BUNDLE_ID"
+            exit 1
+          fi
+          if ! codesign --force --deep --sign - "$APP_PATH"; then
+            echo "::error title=Signature ad hoc impossible::codesign n’a pas pu signer l’archive"
+            exit 1
+          fi
+          if ! codesign --verify --deep --strict --verbose=2 "$APP_PATH"; then
+            echo "::error title=Bundle invalide::codesign a refusé le bundle signé"
+            exit 1
+          fi
 
       - name: Package the application artifact
         run: |
