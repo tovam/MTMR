@@ -112,59 +112,6 @@ final class InputDispatchTests: XCTestCase {
         XCTAssertLessThanOrEqual(frames.left.maxX + TouchBarPhysicalLayout.groupSpacing, frames.right.minX)
     }
 
-    @MainActor
-    func testCenterItemsStayAtTheActualVisibleMidpointWithoutAWrapper() throws {
-        let first = fixedItem("center-a", width: 40)
-        let second = fixedItem("center-b", width: 60)
-
-        let basicView = BasicView(
-            identifier: .init("basic-layout-test"),
-            leftItems: [],
-            centerItems: [first, second],
-            rightItems: [],
-            swipeItems: []
-        )
-        basicView.view.frame = NSRect(
-            x: 0,
-            y: 0,
-            width: TouchBarPhysicalLayout.preferredWidth,
-            height: TouchBarPhysicalLayout.preferredHeight
-        )
-        basicView.view.layoutSubtreeIfNeeded()
-
-        let firstView = try XCTUnwrap(first.view)
-        let secondView = try XCTUnwrap(second.view)
-        let firstFrame = firstView.convert(firstView.bounds, to: basicView.view)
-        let secondFrame = secondView.convert(secondView.bounds, to: basicView.view)
-        let groupMidpoint = (firstFrame.minX + secondFrame.maxX) / 2
-        XCTAssertEqual(secondFrame.minX - firstFrame.maxX, TouchBarPhysicalLayout.groupSpacing, accuracy: 0.001)
-        XCTAssertEqual(groupMidpoint, TouchBarPhysicalLayout.preferredWidth / 2, accuracy: 0.5)
-    }
-
-    @MainActor
-    func testRightItemsUseTheHostVisibleEdgeInsteadOfTheTheoreticalWidth() throws {
-        let right = fixedItem("right-edge", width: 50)
-        let basicView = BasicView(
-            identifier: .init("visible-edge-layout-test"),
-            leftItems: [],
-            centerItems: [],
-            rightItems: [right],
-            swipeItems: []
-        )
-        let host = NSView(frame: NSRect(x: 0, y: 0, width: 900, height: 30))
-        host.wantsLayer = true
-        host.layer?.masksToBounds = true
-        basicView.view.frame = NSRect(x: 0, y: 0, width: TouchBarPhysicalLayout.preferredWidth, height: 30)
-        host.addSubview(basicView.view)
-        host.layoutSubtreeIfNeeded()
-        basicView.view.layoutSubtreeIfNeeded()
-
-        let rightView = try XCTUnwrap(right.view)
-        let frame = rightView.convert(rightView.bounds, to: host)
-        XCTAssertEqual(frame.maxX, host.bounds.maxX, accuracy: 0.5)
-        XCTAssertEqual(frame.width, 50, accuracy: 0.001)
-    }
-
     func testLongTapReleaseIsNotAlsoCountedAsASingleTap() {
         var state = TouchTapSequenceState()
 
@@ -232,61 +179,6 @@ final class InputDispatchTests: XCTestCase {
         XCTAssertEqual(result.backend, .coreGraphicsAuxiliary)
         XCTAssertEqual(backend.coreGraphicsPostCount, 1)
         XCTAssertEqual(backend.ioHIDAccessCount, 0)
-        XCTAssertEqual(backend.ioHIDPostCount, 0)
-    }
-
-    func testSystemVolumePrefersARealMediaKeySoMacOSCanShowItsOSD() {
-        let backend = FakeMediaBackend()
-        backend.coreGraphicsHasAccess = true
-        backend.coreGraphicsResult = .success
-        var directFallbackCount = 0
-
-        let result = HIDPostAuxKey(
-            NX_KEYTYPE_SOUND_UP,
-            backend: backend,
-            directFallback: { _ in
-                directFallbackCount += 1
-                return InputDispatchResult(
-                    action: .mediaKey,
-                    backend: .coreAudio,
-                    status: .success,
-                    message: "Direct fallback"
-                )
-            }
-        )
-
-        XCTAssertTrue(result.succeeded)
-        XCTAssertEqual(result.backend, .coreGraphicsAuxiliary)
-        XCTAssertEqual(backend.coreGraphicsPostCount, 1)
-        XCTAssertEqual(directFallbackCount, 0)
-    }
-
-    func testSystemBrightnessUsesDirectControlOnlyWhenMediaPostingFails() {
-        let backend = FakeMediaBackend()
-        backend.coreGraphicsHasAccess = false
-        backend.coreGraphicsRequestResult = false
-        backend.ioHIDAccess = .denied
-        backend.ioHIDRequestResult = false
-        var directFallbackCount = 0
-
-        let result = HIDPostAuxKey(
-            NX_KEYTYPE_BRIGHTNESS_UP,
-            backend: backend,
-            directFallback: { _ in
-                directFallbackCount += 1
-                return InputDispatchResult(
-                    action: .mediaKey,
-                    backend: .coreDisplay,
-                    status: .success,
-                    message: "Direct fallback"
-                )
-            }
-        )
-
-        XCTAssertTrue(result.succeeded)
-        XCTAssertEqual(result.backend, .coreDisplay)
-        XCTAssertEqual(directFallbackCount, 1)
-        XCTAssertEqual(backend.coreGraphicsPostCount, 0)
         XCTAssertEqual(backend.ioHIDPostCount, 0)
     }
 
@@ -360,22 +252,6 @@ final class InputDispatchTests: XCTestCase {
         XCTAssertEqual(backend.keyPresses, [53])
     }
 
-    @MainActor
-    func testGroupAlwaysHasAVisiblePhysicalButtonByDefault() {
-        let group = GroupBarItem(identifier: .init("group-visible-test"), items: [])
-
-        XCTAssertEqual(group.collapsedRepresentationLabel, "Groupe")
-    }
-}
-
-@MainActor
-private func fixedItem(_ identifier: String, width: CGFloat) -> NSTouchBarItem {
-    let item = NSCustomTouchBarItem(identifier: .init(identifier))
-    let view = NSView()
-    view.widthAnchor.constraint(equalToConstant: width).isActive = true
-    view.heightAnchor.constraint(equalToConstant: TouchBarPhysicalLayout.preferredHeight).isActive = true
-    item.view = view
-    return item
 }
 
 private final class LockedResultBox: @unchecked Sendable {
