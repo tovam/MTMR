@@ -82,11 +82,12 @@ jobs:
             grep -E '(^|: )(error:|fatal error:)|Testing failed:' "$CI_ROOT/swift-tests.log" \
               | tail -n 20 \
               | sed 's/^/::error title=Xcode test::/'
-            grep -Ei 'failed|failure|crash|abort|timed out|XCTAssert' "$CI_ROOT/swift-tests.log" \
-              | tail -n 40 \
+            grep -E "Test Case .* failed|Testing (cancelled|failed)|The test session (crashed|encountered an error)|XCTAssert" "$CI_ROOT/swift-tests.log" \
+              | tail -n 20 \
               | sed 's/^/::error title=XCTest failure::/'
-            tail -n 20 "$CI_ROOT/swift-tests.log" \
-              | sed 's/^/::error title=Xcode test tail::/'
+            TEST_TAIL=$(tail -n 100 "$CI_ROOT/swift-tests.log" \
+              | perl -0777 -pe 's/%/%25/g; s/\r/%0D/g; s/\n/%0A/g')
+            echo "::error title=Xcode test tail::$TEST_TAIL"
             exit "$XCODE_STATUS"
           fi
 
