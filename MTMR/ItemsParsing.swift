@@ -64,6 +64,19 @@ typealias ParametersDecoder = (Decoder) throws -> (
     parameters: [GeneralParameters.CodingKeys: GeneralParameter]
 )
 
+private func predefinedButtonImage(
+    named name: NSImage.Name,
+    fallbackSystemSymbol: String
+) -> NSImage {
+    if let image = NSImage(named: name) {
+        return image
+    }
+    if let image = NSImage(systemSymbolName: fallbackSystemSymbol, accessibilityDescription: nil) {
+        return image
+    }
+    return NSImage(size: NSSize(width: 18, height: 18))
+}
+
 final class SupportedTypesHolder: @unchecked Sendable {
     private let lock = NSLock()
     private var supportedTypes: [String: ParametersDecoder] = [
@@ -88,7 +101,10 @@ final class SupportedTypesHolder: @unchecked Sendable {
         ) },
 
         "brightnessUp": { _ in
-            let imageParameter = GeneralParameter.image(source: #imageLiteral(resourceName: "brightnessUp"))
+            let imageParameter = GeneralParameter.image(source: predefinedButtonImage(
+                named: NSImage.Name("brightnessUp"),
+                fallbackSystemSymbol: "sun.max.fill"
+            ))
             return (
                 item: .staticButton(title: ""),
                 actions: [
@@ -101,7 +117,10 @@ final class SupportedTypesHolder: @unchecked Sendable {
         },
 
         "brightnessDown": { _ in
-            let imageParameter = GeneralParameter.image(source: #imageLiteral(resourceName: "brightnessDown"))
+            let imageParameter = GeneralParameter.image(source: predefinedButtonImage(
+                named: NSImage.Name("brightnessDown"),
+                fallbackSystemSymbol: "sun.min.fill"
+            ))
             return (
                 item: .staticButton(title: ""),
                 actions: [
@@ -114,7 +133,10 @@ final class SupportedTypesHolder: @unchecked Sendable {
         },
 
         "illuminationUp": { _ in
-            let imageParameter = GeneralParameter.image(source: #imageLiteral(resourceName: "ill_up"))
+            let imageParameter = GeneralParameter.image(source: predefinedButtonImage(
+                named: NSImage.Name("ill_up"),
+                fallbackSystemSymbol: "light.max"
+            ))
             return (
                 item: .staticButton(title: ""),
                 actions: [
@@ -127,7 +149,10 @@ final class SupportedTypesHolder: @unchecked Sendable {
         },
 
         "illuminationDown": { _ in
-            let imageParameter = GeneralParameter.image(source: #imageLiteral(resourceName: "ill_down"))
+            let imageParameter = GeneralParameter.image(source: predefinedButtonImage(
+                named: NSImage.Name("ill_down"),
+                fallbackSystemSymbol: "light.min"
+            ))
             return (
                 item: .staticButton(title: ""),
                 actions: [
@@ -140,7 +165,10 @@ final class SupportedTypesHolder: @unchecked Sendable {
         },
 
         "volumeDown": { _ in
-            let imageParameter = GeneralParameter.image(source: NSImage(named: NSImage.touchBarVolumeDownTemplateName)!)
+            let imageParameter = GeneralParameter.image(source: predefinedButtonImage(
+                named: NSImage.touchBarVolumeDownTemplateName,
+                fallbackSystemSymbol: "speaker.wave.1.fill"
+            ))
             return (
                 item: .staticButton(title: ""),
                 actions: [
@@ -153,7 +181,10 @@ final class SupportedTypesHolder: @unchecked Sendable {
         },
 
         "volumeUp": { _ in
-            let imageParameter = GeneralParameter.image(source: NSImage(named: NSImage.touchBarVolumeUpTemplateName)!)
+            let imageParameter = GeneralParameter.image(source: predefinedButtonImage(
+                named: NSImage.touchBarVolumeUpTemplateName,
+                fallbackSystemSymbol: "speaker.wave.3.fill"
+            ))
             return (
                 item: .staticButton(title: ""),
                 actions: [
@@ -166,7 +197,10 @@ final class SupportedTypesHolder: @unchecked Sendable {
         },
 
         "mute": { _ in
-            let imageParameter = GeneralParameter.image(source: NSImage(named: NSImage.touchBarAudioOutputMuteTemplateName)!)
+            let imageParameter = GeneralParameter.image(source: predefinedButtonImage(
+                named: NSImage.touchBarAudioOutputMuteTemplateName,
+                fallbackSystemSymbol: "speaker.slash.fill"
+            ))
             return (
                 item: .staticButton(title: ""),
                 actions: [
@@ -179,7 +213,10 @@ final class SupportedTypesHolder: @unchecked Sendable {
         },
 
         "previous": { _ in
-            let imageParameter = GeneralParameter.image(source: NSImage(named: NSImage.touchBarRewindTemplateName)!)
+            let imageParameter = GeneralParameter.image(source: predefinedButtonImage(
+                named: NSImage.touchBarRewindTemplateName,
+                fallbackSystemSymbol: "backward.fill"
+            ))
             return (
                 item: .staticButton(title: ""),
                 actions: [
@@ -192,7 +229,10 @@ final class SupportedTypesHolder: @unchecked Sendable {
         },
 
         "play": { _ in
-            let imageParameter = GeneralParameter.image(source: NSImage(named: NSImage.touchBarPlayPauseTemplateName)!)
+            let imageParameter = GeneralParameter.image(source: predefinedButtonImage(
+                named: NSImage.touchBarPlayPauseTemplateName,
+                fallbackSystemSymbol: "playpause.fill"
+            ))
             return (
                 item: .staticButton(title: ""),
                 actions: [
@@ -205,7 +245,10 @@ final class SupportedTypesHolder: @unchecked Sendable {
         },
 
         "next": { _ in
-            let imageParameter = GeneralParameter.image(source: NSImage(named: NSImage.touchBarFastForwardTemplateName)!)
+            let imageParameter = GeneralParameter.image(source: predefinedButtonImage(
+                named: NSImage.touchBarFastForwardTemplateName,
+                fallbackSystemSymbol: "forward.fill"
+            ))
             return (
                 item: .staticButton(title: ""),
                 actions: [
